@@ -2,15 +2,6 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
 
-const defaultRoster = [
-  { firstName: "Maria", lastName: "Santos", email: "maria@resort.com", department: "Housekeeping", role: "Room Attendant", shift: "Morning (06:00 - 14:00)" },
-  { firstName: "Elena", lastName: "Cruz", email: "elena@resort.com", department: "Housekeeping", role: "Room Attendant", shift: "Morning (06:00 - 14:00)" },
-  { firstName: "Juan", lastName: "Reyes", email: "juan@resort.com", department: "Maintenance", role: "Technician", shift: "Morning (06:00 - 14:00)" },
-  { firstName: "Rico", lastName: "Santos", email: "rico@resort.com", department: "Maintenance", role: "Technician", shift: "Afternoon (14:00 - 22:00)" },
-  { firstName: "Ana", lastName: "Dela Cruz", email: "ana@resort.com", department: "Front Desk", role: "Receptionist", shift: "Morning (06:00 - 14:00)" },
-  { firstName: "Pedro", lastName: "Gomez", email: "pedro@resort.com", department: "Security", role: "Security Officer", shift: "Morning (06:00 - 14:00)" }
-];
-
 export async function GET() {
   try {
     const session = await getSession();
@@ -21,59 +12,10 @@ export async function GET() {
     const hotelId = session.hotelId;
 
     // Fetch existing users
-    let dbUsers = await prisma.user.findMany({
+    const dbUsers = await prisma.user.findMany({
       where: { hotelId, role: 'worker' },
       include: { department: true }
     });
-
-    if (dbUsers.length === 0) {
-      // Seed default workers in DB
-      // Fetch or create departments to align
-      const dbDepts = await prisma.department.findMany({ where: { hotelId } });
-      const deptMap = new Map(dbDepts.map(d => [d.name.toLowerCase(), d.id]));
-
-      // If departments are not found, let's create the default ones first
-      const housekeepingId = deptMap.get('housekeeping') || (await prisma.department.create({ data: { hotelId, name: 'Housekeeping' } })).id;
-      const maintenanceId = deptMap.get('maintenance') || (await prisma.department.create({ data: { hotelId, name: 'Maintenance' } })).id;
-      const frontdeskId = deptMap.get('front desk') || deptMap.get('frontdesk') || (await prisma.department.create({ data: { hotelId, name: 'Front Desk' } })).id;
-      const securityId = deptMap.get('security') || (await prisma.department.create({ data: { hotelId, name: 'Security' } })).id;
-      const laundryId = deptMap.get('laundry') || (await prisma.department.create({ data: { hotelId, name: 'Laundry' } })).id;
-
-      const seedDepts: Record<string, number> = {
-        'housekeeping': housekeepingId,
-        'maintenance': maintenanceId,
-        'front desk': frontdeskId,
-        'security': securityId,
-        'laundry': laundryId
-      };
-
-      for (const worker of defaultRoster) {
-        const dId = seedDepts[worker.department.toLowerCase()] || housekeepingId;
-        
-        // Check if user already exists globally
-        const existingGlobal = await prisma.user.findUnique({
-          where: { email: worker.email }
-        });
-        if (!existingGlobal) {
-          await prisma.user.create({
-            data: {
-              name: `${worker.firstName} ${worker.lastName}`,
-              email: worker.email,
-              password: 'password',
-              role: 'worker',
-              hotelId,
-              departmentId: dId,
-              schedule: { shift: worker.shift }
-            }
-          });
-        }
-      }
-
-      dbUsers = await prisma.user.findMany({
-        where: { hotelId, role: 'worker' },
-        include: { department: true }
-      });
-    }
 
     // Map DB Users to matching format expected by Dashboard and Worker page
     // Active tasks, intensityScore can be computed from actual database Tasks!

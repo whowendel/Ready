@@ -5,14 +5,15 @@ import { useState, useEffect } from "react";
 interface Step2Props {
   data: any;
   onChange: (newData: any) => void;
-  onCheckpointUpdate?: (score: number, isComplete: boolean) => void;
+  onCheckpointUpdate?: (score: number, isComplete: boolean, auditData?: any) => void;
+  auditState?: any;
 }
 
 const standardAmenities = ["WiFi", "Air Conditioning", "Smart TV", "Mini Bar", "Safe", "Balcony", "Coffee Maker", "Bathtub"];
 const standardFacilities = ["Swimming Pool", "Restaurant", "Gym", "Bar", "Spa", "Conference Hall"];
 const standardBeds = ["King Bed", "Queen Bed", "Double Bed", "Single Bed"];
 
-export default function Step2Services({ data, onChange, onCheckpointUpdate }: Step2Props) {
+export default function Step2Services({ data, onChange, onCheckpointUpdate, auditState }: Step2Props) {
   // Checkpoint State
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditScore, setAuditScore] = useState<number>(0);
@@ -20,7 +21,18 @@ export default function Step2Services({ data, onChange, onCheckpointUpdate }: St
   const [warnings, setWarnings] = useState<string[]>([]);
   const [customAmenityInputs, setCustomAmenityInputs] = useState<Record<number, string>>({});
 
-
+  // Sync with parent auditState
+  useEffect(() => {
+    if (auditState) {
+      setAuditScore(auditState.score || 0);
+      setAuditComplete(auditState.isComplete || false);
+      setWarnings(auditState.warnings || []);
+    } else {
+      setAuditScore(0);
+      setAuditComplete(false);
+      setWarnings([]);
+    }
+  }, [auditState]);
 
   const runPhaseAudit = async () => {
     setIsAuditing(true);
@@ -31,7 +43,11 @@ export default function Step2Services({ data, onChange, onCheckpointUpdate }: St
         setAuditComplete(true);
         setWarnings([]);
         if (onCheckpointUpdate) {
-          onCheckpointUpdate(100, true);
+          onCheckpointUpdate(100, true, {
+            warnings: [],
+            followUpQuestions: [],
+            templates: []
+          });
         }
         return;
       }
@@ -47,7 +63,11 @@ export default function Step2Services({ data, onChange, onCheckpointUpdate }: St
         setAuditComplete(resData.isComplete);
         setWarnings(resData.warnings || []);
         if (onCheckpointUpdate) {
-          onCheckpointUpdate(resData.score, resData.isComplete);
+          onCheckpointUpdate(resData.score, resData.isComplete, {
+            warnings: resData.warnings || [],
+            followUpQuestions: resData.followUpQuestions || [],
+            templates: resData.templates || []
+          });
         }
       }
     } catch (err) {

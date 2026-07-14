@@ -6,10 +6,11 @@ import { useRouter } from "next/navigation";
 interface Step6Props {
   data: any;
   onChange: (newData: any) => void;
-  onCheckpointUpdate?: (score: number, isComplete: boolean) => void;
+  onCheckpointUpdate?: (score: number, isComplete: boolean, auditData?: any) => void;
+  auditState?: any;
 }
 
-export default function Step6Blueprint({ data, onChange, onCheckpointUpdate }: Step6Props) {
+export default function Step6Blueprint({ data, onChange, onCheckpointUpdate, auditState }: Step6Props) {
   const router = useRouter();
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +24,19 @@ export default function Step6Blueprint({ data, onChange, onCheckpointUpdate }: S
   // Compiling Simulation State
   const [isCompiling, setIsCompiling] = useState(false);
   const [compileLog, setCompileLog] = useState("Initializing database tables...");
+
+  // Sync with parent auditState
+  useEffect(() => {
+    if (auditState) {
+      setAuditScore(auditState.score || 0);
+      setAuditComplete(auditState.isComplete || false);
+      setWarnings(auditState.warnings || []);
+    } else {
+      setAuditScore(0);
+      setAuditComplete(false);
+      setWarnings([]);
+    }
+  }, [auditState]);
 
   // Generate default list of tasks on mount if empty
   useEffect(() => {
@@ -87,8 +101,6 @@ export default function Step6Blueprint({ data, onChange, onCheckpointUpdate }: S
     }
   }, []);
 
-
-
   const runPhaseAudit = async () => {
     setIsAuditing(true);
     try {
@@ -98,7 +110,11 @@ export default function Step6Blueprint({ data, onChange, onCheckpointUpdate }: S
         setAuditComplete(true);
         setWarnings([]);
         if (onCheckpointUpdate) {
-          onCheckpointUpdate(100, true);
+          onCheckpointUpdate(100, true, {
+            warnings: [],
+            followUpQuestions: [],
+            templates: []
+          });
         }
         return;
       }
@@ -114,7 +130,11 @@ export default function Step6Blueprint({ data, onChange, onCheckpointUpdate }: S
         setAuditComplete(resData.isComplete);
         setWarnings(resData.warnings || []);
         if (onCheckpointUpdate) {
-          onCheckpointUpdate(resData.score, resData.isComplete);
+          onCheckpointUpdate(resData.score, resData.isComplete, {
+            warnings: resData.warnings || [],
+            followUpQuestions: resData.followUpQuestions || [],
+            templates: resData.templates || []
+          });
         }
       }
     } catch (err) {

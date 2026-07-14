@@ -54,13 +54,24 @@ const worker = new Worker(
         },
       });
 
-      const absolutePath = path.resolve(doc.filePath);
-      if (!fs.existsSync(absolutePath)) {
-        throw new Error(`File not found at path: ${absolutePath}`);
+      let filePart;
+      if (doc.filePath.startsWith('data:')) {
+        const base64Data = doc.filePath.split(',')[1];
+        filePart = {
+          inlineData: {
+            data: base64Data,
+            mimeType: doc.mimeType,
+          },
+        };
+      } else {
+        const absolutePath = path.resolve(doc.filePath);
+        if (!fs.existsSync(absolutePath)) {
+          throw new Error(`File not found at path: ${absolutePath}`);
+        }
+        filePart = fileToGenerativePart(absolutePath, doc.mimeType);
       }
 
       console.log(`[Job ${job.id}] Uploading document to Gemini 2.5 Flash for structured extraction...`);
-      const filePart = fileToGenerativePart(absolutePath, doc.mimeType);
 
       const prompt = `
 You are a senior Hotel Operations Auditor AI. Perform a strategic document scan on the attached document to extract operational database entries.

@@ -31,15 +31,6 @@ export async function assignTaskDynamically(
       }
     });
 
-    let isFallback = false;
-    if (workers.length === 0) {
-      // If no workers exist in the specified department, fallback to any worker in the hotel
-      workers = await prisma.user.findMany({
-        where: { hotelId, role: 'worker', isOnShift: true }
-      });
-      isFallback = true;
-    }
-
     if (workers.length === 0) {
       return { workerId: null, isOverloaded: false };
     }
@@ -86,7 +77,7 @@ You are the READY AI Smart Dispatcher. You are tasked with assigning a new guest
 
 New Task Details:
 - Name: "${taskDetails.name}"
-- Department: "${deptName}" (Is Fallback: ${isFallback})
+- Department: "${deptName}"
 - Location: "${taskDetails.room}"
 - Workload Intensity/Difficulty (1-5): ${taskDetails.difficulty}
 - Priority: "${taskDetails.priority}"
@@ -137,23 +128,7 @@ async function fallbackAssignTaskHeuristically(hotelId: number, deptName: string
   });
 
   if (workers.length === 0) {
-    const fallbackWorkers = await prisma.user.findMany({ where: { hotelId, role: 'worker', isOnShift: true } });
-    if (fallbackWorkers.length === 0) return { workerId: null, isOverloaded: false };
-    const activeTasks = await prisma.task.findMany({
-      where: { hotelId, status: { in: ['in_progress', 'backlog'] }, workerId: { in: fallbackWorkers.map(w => w.id) } }
-    });
-    const taskCounts: Record<number, number> = {};
-    fallbackWorkers.forEach(w => { taskCounts[w.id] = 0; });
-    activeTasks.forEach(t => { if (t.workerId) taskCounts[t.workerId]++; });
-    let bestWorkerId = fallbackWorkers[0].id;
-    let minTasks = taskCounts[bestWorkerId];
-    fallbackWorkers.forEach(w => {
-      if (taskCounts[w.id] < minTasks) {
-        minTasks = taskCounts[w.id];
-        bestWorkerId = w.id;
-      }
-    });
-    return { workerId: minTasks >= 5 ? null : bestWorkerId, isOverloaded: minTasks >= 5 };
+    return { workerId: null, isOverloaded: false };
   }
 
   const activeTasks = await prisma.task.findMany({

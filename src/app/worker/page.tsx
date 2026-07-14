@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { getPHTTimestamp } from "@/lib/time";
 
 export default function WorkerPortal() {
   const router = useRouter();
@@ -32,10 +33,10 @@ export default function WorkerPortal() {
     try {
       const parsed = JSON.parse(rawText);
       if (parsed && typeof parsed === 'object' && 'text' in parsed) {
-        return { text: parsed.text, audio: parsed.audio };
+        return { text: parsed.text, audio: parsed.audio, summary: parsed.summary };
       }
     } catch (e) {}
-    return { text: rawText, audio: null };
+    return { text: rawText, audio: null, summary: undefined };
   };
 
   // Helper to play PTT clip audio
@@ -86,6 +87,7 @@ export default function WorkerPortal() {
           const transcript = pttText.trim() || "Voice message";
           const finalDuration = formatDuration(recordingDuration);
           
+          setIsActionLoading(true);
           try {
             await fetch("/api/dashboard/ptt", {
               method: "POST",
@@ -100,6 +102,8 @@ export default function WorkerPortal() {
             fetchData();
           } catch (err) {
             console.error("Failed to post PTT clip:", err);
+          } finally {
+            setIsActionLoading(false);
           }
           
           setPttText("");
@@ -171,9 +175,51 @@ export default function WorkerPortal() {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // Simulated Camera / Photo Upload State
+  // Camera and Action states
   const [uploadingTaskId, setUploadingTaskId] = useState<string | null>(null);
   const [simulatedPhoto, setSimulatedPhoto] = useState<string | null>(null);
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const [useCamera, setUseCamera] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const startCamera = async () => {
+    setUseCamera(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Camera access failed", err);
+      alert("Could not access camera. Please upload a file instead.");
+      setUseCamera(false);
+    }
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement("canvas");
+      canvas.width = videoRef.current.videoWidth || 640;
+      canvas.height = videoRef.current.videoHeight || 480;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg");
+        setSimulatedPhoto(dataUrl);
+      }
+      stopCamera();
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setUseCamera(false);
+  };
 
   // Fetch all worker operational data
   const fetchData = async () => {
@@ -251,7 +297,12 @@ export default function WorkerPortal() {
     fetchData();
     // Poll data every 4 seconds for real-time synchronization
     const timer = setInterval(fetchData, 4000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
   }, []);
 
   // Handle Logout
@@ -268,6 +319,7 @@ export default function WorkerPortal() {
 
   // Start / Activate a task
   const handleActivateTask = async (taskId: string) => {
+    setIsActionLoading(true);
     try {
       const res = await fetch("/api/dashboard/tasks", {
         method: "POST",
@@ -279,6 +331,8 @@ export default function WorkerPortal() {
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -302,7 +356,6 @@ export default function WorkerPortal() {
 
   // Simulate a quick camera snap
   const handleSimulateCameraSnap = () => {
-    // A simple red completion check image representation in base64
     const mockBase64 = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23FF2E2E'/><text x='50%' y='55%' font-family='sans-serif' font-size='12' font-weight='bold' fill='white' text-anchor='middle'>QA PASS</text></svg>";
     setSimulatedPhoto(mockBase64);
   };
@@ -314,11 +367,9 @@ export default function WorkerPortal() {
       return;
     }
 
+    setIsActionLoading(true);
     try {
-      const today = new Date();
-      const formattedDate = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      const formattedTime = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-      const completionString = `${formattedDate}, ${formattedTime}`;
+      const completionString = getPHTTimestamp();
 
       const res = await fetch("/api/dashboard/tasks", {
         method: "POST",
@@ -335,9 +386,14 @@ export default function WorkerPortal() {
         setUploadingTaskId(null);
         setSimulatedPhoto(null);
         fetchData();
+      } else {
+        const errorJson = await res.json().catch(() => ({}));
+        alert(errorJson.error || "Failed to complete task.");
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -346,6 +402,7 @@ export default function WorkerPortal() {
     e.preventDefault();
     if (!pttText.trim()) return;
 
+    setIsActionLoading(true);
     try {
       const res = await fetch("/api/dashboard/ptt", {
         method: "POST",
@@ -364,6 +421,8 @@ export default function WorkerPortal() {
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -372,18 +431,15 @@ export default function WorkerPortal() {
     e.preventDefault();
     if (!newHandover.trim()) return;
 
+    setIsActionLoading(true);
     try {
-      const today = new Date();
-      const formattedDate = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      const formattedTime = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
       const res = await fetch("/api/dashboard/handovers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           author: profile?.name || "Staff",
           text: newHandover.trim(),
-          time: `${formattedDate}, ${formattedTime}`
+          time: getPHTTimestamp()
         })
       });
 
@@ -393,6 +449,8 @@ export default function WorkerPortal() {
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -421,36 +479,36 @@ export default function WorkerPortal() {
   const isShielded = profile.inProgressCount >= 1;
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-      
-      {/* Smartphone Device Frame Container */}
-      <div className="w-[375px] h-[780px] bg-slate-900 rounded-[48px] shadow-2xl p-3 border-4 border-slate-950 flex flex-col relative overflow-hidden">
-        
-        {/* Device Notch Speaker */}
-        <div className="absolute top-3 left-1/2 transform -translate-x-1/2 w-32 h-4.5 bg-slate-950 rounded-b-xl z-50 flex items-center justify-center">
-          <div className="w-12 h-1 bg-slate-800 rounded-full" />
+    <div className="min-h-screen bg-slate-100 flex flex-col justify-between text-slate-850 font-sans relative">
+      {/* Action processing loading overlay */}
+      {isActionLoading && (
+        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center space-y-4">
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-extrabold text-indigo-950 uppercase tracking-widest animate-pulse">
+            READY: Updating task & processing...
+          </p>
         </div>
+      )}
 
-        {/* Simulated Inner Screen */}
-        <div className="flex-grow bg-slate-50 rounded-[38px] overflow-hidden flex flex-col justify-between relative text-slate-850">
-          
-          {/* Phone Header Banner */}
-          <div className="bg-white border-b border-slate-200 pt-6 px-4 pb-3 flex justify-between items-center z-40 shadow-sm">
-            <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block">Ready Worker</span>
-              <span className="text-sm font-black text-black">READY.</span>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <span className="text-[9px] font-bold text-slate-400">LTE [94%]</span>
-              <button
-                onClick={handleLogout}
-                className="px-2 py-1 bg-slate-100 border border-slate-200 hover:bg-blue-50 text-[9px] font-bold rounded-lg text-slate-700 transition"
-              >
-                Log Out
-              </button>
-            </div>
+      {/* Main Responsive Page Container */}
+      <div className="flex-grow flex flex-col max-w-lg mx-auto w-full bg-slate-50 shadow-xl border-x border-slate-200 min-h-screen relative justify-between">
+        
+        {/* Phone Header Banner */}
+        <div className="bg-white border-b border-slate-200 pt-5 px-6 pb-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block">Ready Worker</span>
+            <span className="text-sm font-black text-black">READY.</span>
           </div>
+          
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1.5 bg-slate-100 border border-slate-200 hover:bg-blue-50 text-[10px] font-bold rounded-lg text-slate-700 transition cursor-pointer"
+            >
+              Log Out
+            </button>
+          </div>
+        </div>
 
           {/* Worker Identity Info Block */}
           <div className="bg-white px-4 py-3 border-b border-slate-200 flex justify-between items-center text-xs">
@@ -582,35 +640,77 @@ export default function WorkerPortal() {
                                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                                   <p className="text-[10px] font-bold text-black uppercase tracking-wider">Photo Proof Uploader</p>
                                   
-                                  <div className="flex gap-2">
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={handleFileChange}
-                                      className="hidden"
-                                      id="phone-file-picker"
-                                    />
-                                    <label
-                                      htmlFor="phone-file-picker"
-                                      className="flex-1 text-center py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-800 hover:bg-slate-100 cursor-pointer"
-                                    >
-                                      Upload File
-                                    </label>
-                                    <button
-                                      type="button"
-                                      onClick={handleSimulateCameraSnap}
-                                      className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg transition cursor-pointer"
-                                    >
-                                      Simulate Snap
-                                    </button>
-                                  </div>
+                                  {useCamera ? (
+                                    <div className="space-y-2">
+                                      <video ref={videoRef} autoPlay playsInline className="w-full h-44 bg-black rounded-lg object-cover" />
+                                      <div className="flex gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={capturePhoto}
+                                          className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg cursor-pointer"
+                                        >
+                                          Capture Snap
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={stopCamera}
+                                          className="flex-1 py-1.5 bg-slate-250 hover:bg-slate-300 text-slate-800 text-[10px] font-bold rounded-lg cursor-pointer"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="flex flex-col gap-2">
+                                      <div className="flex gap-2">
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          onChange={handleFileChange}
+                                          className="hidden"
+                                          id="phone-file-picker"
+                                        />
+                                        <label
+                                          htmlFor="phone-file-picker"
+                                          className="flex-1 text-center py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-800 hover:bg-slate-100 cursor-pointer"
+                                        >
+                                          Upload File
+                                        </label>
+                                        <button
+                                          type="button"
+                                          onClick={startCamera}
+                                          className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg transition cursor-pointer"
+                                        >
+                                          Open Camera
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={handleSimulateCameraSnap}
+                                          className="py-2 px-2.5 bg-slate-250 hover:bg-slate-300 text-slate-700 text-[10px] font-bold rounded-lg transition cursor-pointer"
+                                          title="Simulate Quick Snap"
+                                        >
+                                          Simulate
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
 
                                   {simulatedPhoto && (
-                                    <div className="space-y-2">
-                                      <p className="text-[9px] font-mono italic text-slate-500 truncate">Attachment loaded successfully.</p>
+                                    <div className="space-y-2 pt-2 border-t border-slate-200">
+                                      <div className="flex items-center justify-between">
+                                        <p className="text-[9px] font-mono italic text-slate-500">Preview:</p>
+                                        <button 
+                                          type="button" 
+                                          onClick={() => setSimulatedPhoto(null)}
+                                          className="text-[9.5px] text-red-500 font-bold hover:underline"
+                                        >
+                                          Clear
+                                        </button>
+                                      </div>
+                                      <img src={simulatedPhoto} alt="Proof preview" className="w-full h-32 object-cover rounded-lg border border-slate-200 shadow-sm" />
                                       <button
                                         onClick={() => handleCompleteTask(t.id)}
-                                        className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg shadow transition cursor-pointer"
+                                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg shadow transition cursor-pointer"
                                       >
                                         Submit to QA Dashboard
                                       </button>
@@ -737,16 +837,21 @@ export default function WorkerPortal() {
                   <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Radio Feed logs</h3>
                   <div className="space-y-2 max-h-[220px] overflow-y-auto">
                     {pttClips.map((clip) => {
-                      const { text } = parsePttText(clip.text);
+                      const { text, summary } = parsePttText(clip.text);
                       return (
                         <div key={clip.id} className="p-2.5 bg-white border border-slate-200 rounded-xl text-xs flex justify-between items-center gap-2 shadow-sm">
                           <div>
                             <p className="font-bold text-black">{clip.sender} <span className="text-[9px] text-slate-400 font-medium ml-1">{clip.timestamp}</span></p>
                             <p className="text-[10px] italic text-slate-850 mt-0.5">"{text}"</p>
+                            {summary && (
+                              <p className="text-[8px] bg-blue-50 text-blue-700 border border-blue-200/50 px-1.5 py-0.2 rounded font-bold mt-1 inline-block">
+                                Topic: {summary}
+                              </p>
+                            )}
                           </div>
                           <button
                             onClick={() => playPttClip(clip)}
-                            className="px-2.5 py-1 bg-slate-100 hover:bg-blue-600 hover:text-white border border-slate-200 text-[9px] font-bold rounded transition cursor-pointer"
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-blue-600 hover:text-white border border-slate-200 text-[9px] font-bold rounded transition cursor-pointer shrink-0"
                           >
                             Play ({clip.duration})
                           </button>
@@ -800,13 +905,13 @@ export default function WorkerPortal() {
 
           </div>
 
-          {/* Phone Bottom Viewport Switcher (No Emojis) */}
-          <div className="bg-white border-t border-slate-200 p-2 grid grid-cols-3 gap-1 z-40 shadow-inner rounded-b-[38px] sticky bottom-0">
+          {/* Bottom Viewport Switcher */}
+          <div className="bg-white border-t border-slate-200 p-2.5 grid grid-cols-3 gap-1 z-40 shadow-inner sticky bottom-0">
             <button
               onClick={() => setActiveTab("tasks")}
-              className={`py-2 text-center text-[10px] font-black rounded-xl transition ${
+              className={`py-2.5 text-center text-[10px] font-black rounded-xl transition cursor-pointer ${
                 activeTab === "tasks"
-                  ? "bg-blue-50 text-blue-600"
+                  ? "bg-blue-55 text-indigo-600 font-bold bg-indigo-50"
                   : "text-slate-800 hover:text-black"
               }`}
             >
@@ -814,9 +919,9 @@ export default function WorkerPortal() {
             </button>
             <button
               onClick={() => setActiveTab("ptt")}
-              className={`py-2 text-center text-[10px] font-black rounded-xl transition ${
+              className={`py-2.5 text-center text-[10px] font-black rounded-xl transition cursor-pointer ${
                 activeTab === "ptt"
-                  ? "bg-blue-50 text-blue-600"
+                  ? "bg-blue-55 text-indigo-600 font-bold bg-indigo-50"
                   : "text-slate-800 hover:text-black"
               }`}
             >
@@ -824,9 +929,9 @@ export default function WorkerPortal() {
             </button>
             <button
               onClick={() => setActiveTab("handover")}
-              className={`py-2 text-center text-[10px] font-black rounded-xl transition ${
+              className={`py-2.5 text-center text-[10px] font-black rounded-xl transition cursor-pointer ${
                 activeTab === "handover"
-                  ? "bg-blue-50 text-blue-600"
+                  ? "bg-blue-55 text-indigo-600 font-bold bg-indigo-50"
                   : "text-slate-800 hover:text-black"
               }`}
             >
@@ -834,7 +939,6 @@ export default function WorkerPortal() {
             </button>
           </div>
 
-        </div>
       </div>
     </div>
   );

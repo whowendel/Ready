@@ -98,6 +98,16 @@ export default function OnboardingChassis() {
     const savedBypass = localStorage.getItem("aiBypass") === "true";
     setAiBypass(savedBypass);
 
+    // Load validated steps cache from localStorage
+    const savedValidated = localStorage.getItem("onboarding_validated_steps");
+    if (savedValidated) {
+      try {
+        setValidatedSteps(JSON.parse(savedValidated));
+      } catch (e) {
+        console.error("Failed to parse validated steps", e);
+      }
+    }
+
     // Fetch draft session
     fetch("/api/onboarding/session")
       .then((res) => res.json())
@@ -140,13 +150,57 @@ export default function OnboardingChassis() {
     window.location.reload();
   };
 
-  const handleCheckpointUpdate = (score: number, isComplete: boolean) => {
+  const [validatedSteps, setValidatedSteps] = useState<Record<string, any>>({});
+
+  const getStepDataForComparison = (stepKey: string, data: any) => {
+    if (stepKey === "foundation") return data.foundation;
+    if (stepKey === "services") return { roomTypes: data.roomTypes, amenities: data.amenities, facilities: data.facilities };
+    if (stepKey === "choose_depts") return data.departments;
+    if (stepKey.startsWith("dept_")) {
+      const deptName = stepKey.replace("dept_", "");
+      return data.departments?.find((d: any) => d.name.toLowerCase() === deptName);
+    }
+    if (stepKey === "blueprint") return { floors: data.floors, blueprint: data.blueprint };
+    if (stepKey === "policies") return { policies: data.policies, faqs: data.faqs, emergencyProcedures: data.emergencyProcedures };
+    if (stepKey === "ops_blueprint") return data.operationalBlueprint;
+    return data;
+  };
+
+  const handleCheckpointUpdate = (score: number, isComplete: boolean, auditData?: any) => {
     setIsStepComplete(isComplete || aiBypass);
+    if (isComplete) {
+      const stepVal = {
+        score,
+        isComplete,
+        warnings: auditData?.warnings || [],
+        followUpQuestions: auditData?.followUpQuestions || [],
+        templates: auditData?.templates || [],
+        dataStr: JSON.stringify(getStepDataForComparison(activeStep, draftData))
+      };
+      setValidatedSteps(prev => {
+        const copy = { ...prev, [activeStep]: stepVal };
+        localStorage.setItem("onboarding_validated_steps", JSON.stringify(copy));
+        return copy;
+      });
+    }
   };
 
   const handleDataChange = (updatedData: any) => {
     setDraftData(updatedData);
     triggerAutosave(updatedData, activeStep);
+    
+    // Check if the change invalidated the active step's complete status
+    const stepVal = validatedSteps[activeStep];
+    const currentDataStr = JSON.stringify(getStepDataForComparison(activeStep, updatedData));
+    if (stepVal && stepVal.dataStr !== currentDataStr) {
+      setIsStepComplete(false);
+      setValidatedSteps(prev => {
+        const copy = { ...prev };
+        delete copy[activeStep];
+        localStorage.setItem("onboarding_validated_steps", JSON.stringify(copy));
+        return copy;
+      });
+    }
   };
 
   const triggerAutosave = async (dataToSave: any, stepToSave: string) => {
@@ -167,9 +221,33 @@ export default function OnboardingChassis() {
   };
 
   const navigateToStep = (targetStep: string) => {
-    setIsStepComplete(false); // Reset complete status for next page load
+    // Check if target step has been validated and did not change
+    const stepVal = validatedSteps[targetStep];
+    const currentDataStr = JSON.stringify(getStepDataForComparison(targetStep, draftData));
+    
+    if (stepVal && stepVal.dataStr === currentDataStr) {
+      setIsStepComplete(true);
+    } else {
+      setIsStepComplete(false);
+    }
     setActiveStep(targetStep);
     triggerAutosave(draftData, targetStep);
+  };
+
+  const isStepEnabled = (stepId: string, idx: number) => {
+    if (aiBypass) return true;
+    if (idx <= currentIdx) return true; // Can always click current or previous steps
+    
+    // Find the highest index of a validated step in the stepsList
+    let maxValidatedIdx = -1;
+    stepsList.forEach((s, i) => {
+      if (validatedSteps[s.id]) {
+        maxValidatedIdx = Math.max(maxValidatedIdx, i);
+      }
+    });
+    
+    // Allow clicking if this step has been validated, or is the next step to be configured
+    return idx <= maxValidatedIdx + 1;
   };
 
   const stepsList = getStepsList();
@@ -249,17 +327,17 @@ export default function OnboardingChassis() {
                     {/* Circle indicator */}
                     <div className={`absolute left-[-30px] h-[20px] w-[20px] rounded-full flex items-center justify-center text-[10px] font-bold z-10 transition ${
                       isActive ? "bg-blue-600 text-white shadow-sm ring-4 ring-blue-100" :
-                      isCompleted ? "bg-blue-600 text-white" :
+                      validatedSteps[step.id] ? "bg-blue-600 text-white" :
                       "bg-white border-2 border-slate-300 text-slate-400"
                     }`}>
-                      {isCompleted ? "✓" : idx + 1}
+                      {validatedSteps[step.id] ? "✓" : idx + 1}
                     </div>
                     <button
-                      onClick={() => (idx <= currentIdx || aiBypass) && navigateToStep(step.id)}
-                      disabled={idx > currentIdx && !aiBypass}
+                      onClick={() => isStepEnabled(step.id, idx) && navigateToStep(step.id)}
+                      disabled={!isStepEnabled(step.id, idx)}
                       className={`text-left group transition focus:outline-none ${
                         isActive ? "text-blue-700 font-bold" :
-                        isCompleted ? "text-slate-700 font-semibold hover:text-black" :
+                        isStepEnabled(step.id, idx) ? "text-slate-700 font-semibold hover:text-black" :
                         "text-slate-400 cursor-not-allowed"
                       }`}
                     >
@@ -288,6 +366,7 @@ export default function OnboardingChassis() {
               onChange={handleDataChange} 
               hotelId={hotelId} 
               onCheckpointUpdate={handleCheckpointUpdate}
+              auditState={validatedSteps["foundation"]}
             />
           )}
           {activeStep === "services" && (
@@ -295,6 +374,7 @@ export default function OnboardingChassis() {
               data={draftData} 
               onChange={handleDataChange} 
               onCheckpointUpdate={handleCheckpointUpdate}
+              auditState={validatedSteps["services"]}
             />
           )}
           {activeStep === "choose_depts" && (
@@ -303,6 +383,7 @@ export default function OnboardingChassis() {
               onChange={handleDataChange} 
               onCheckpointUpdate={handleCheckpointUpdate}
               mode="choose"
+              auditState={validatedSteps["choose_depts"]}
             />
           )}
           {typeof activeStep === "string" && activeStep.startsWith("dept_") && (
@@ -314,6 +395,7 @@ export default function OnboardingChassis() {
               selectedDeptName={
                 (draftData.departments || []).find((d: any) => d.name.toLowerCase() === activeStep.substring(5))?.name || ""
               }
+              auditState={validatedSteps[activeStep]}
             />
           )}
           {activeStep === "blueprint" && (
@@ -321,6 +403,7 @@ export default function OnboardingChassis() {
               data={draftData} 
               onChange={handleDataChange} 
               onCheckpointUpdate={handleCheckpointUpdate}
+              auditState={validatedSteps["blueprint"]}
             />
           )}
           {activeStep === "policies" && (
@@ -328,6 +411,7 @@ export default function OnboardingChassis() {
               data={draftData} 
               onChange={handleDataChange} 
               onCheckpointUpdate={handleCheckpointUpdate}
+              auditState={validatedSteps["policies"]}
             />
           )}
           {activeStep === "ops_blueprint" && (
@@ -335,6 +419,7 @@ export default function OnboardingChassis() {
               data={draftData} 
               onChange={handleDataChange} 
               onCheckpointUpdate={handleCheckpointUpdate}
+              auditState={validatedSteps["ops_blueprint"]}
             />
           )}
 

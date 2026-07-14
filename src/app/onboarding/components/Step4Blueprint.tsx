@@ -5,10 +5,11 @@ import { useState, useEffect } from "react";
 interface Step4Props {
   data: any;
   onChange: (newData: any) => void;
-  onCheckpointUpdate?: (score: number, isComplete: boolean) => void;
+  onCheckpointUpdate?: (score: number, isComplete: boolean, auditData?: any) => void;
+  auditState?: any;
 }
 
-export default function Step4Blueprint({ data, onChange, onCheckpointUpdate }: Step4Props) {
+export default function Step4Blueprint({ data, onChange, onCheckpointUpdate, auditState }: Step4Props) {
   // Checkpoint State
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditScore, setAuditScore] = useState<number>(0);
@@ -16,10 +17,33 @@ export default function Step4Blueprint({ data, onChange, onCheckpointUpdate }: S
   const [warnings, setWarnings] = useState<string[]>([]);
   const [uploadingFloor, setUploadingFloor] = useState<number | null>(null);
 
-  // Trigger phase audit on mount
+  // Layout Designer State
+  const [activeCellConfig, setActiveCellConfig] = useState<{ floorIdx: number, x: number, y: number } | null>(null);
+  const [configBlockType, setConfigBlockType] = useState<"room" | "facility">("room");
+  const [configRoomType, setConfigRoomType] = useState<string>("");
+  const [configFacilityName, setConfigFacilityName] = useState<string>("");
+  const [configBlockName, setConfigBlockName] = useState<string>("");
+  const [expandedFloorLayout, setExpandedFloorLayout] = useState<number | null>(null);
+
+  // Sync with parent auditState
   useEffect(() => {
-    runPhaseAudit();
-  }, []);
+    if (auditState) {
+      setAuditScore(auditState.score || 0);
+      setAuditComplete(auditState.isComplete || false);
+      setWarnings(auditState.warnings || []);
+    } else {
+      setAuditScore(0);
+      setAuditComplete(false);
+      setWarnings([]);
+    }
+  }, [auditState]);
+
+  // Trigger phase audit on mount (only if no cached auditState)
+  useEffect(() => {
+    if (!auditState) {
+      runPhaseAudit();
+    }
+  }, [auditState]);
 
   const runPhaseAudit = async () => {
     setIsAuditing(true);
@@ -30,7 +54,11 @@ export default function Step4Blueprint({ data, onChange, onCheckpointUpdate }: S
         setAuditComplete(true);
         setWarnings([]);
         if (onCheckpointUpdate) {
-          onCheckpointUpdate(100, true);
+          onCheckpointUpdate(100, true, {
+            warnings: [],
+            followUpQuestions: [],
+            templates: []
+          });
         }
         return;
       }
@@ -46,7 +74,11 @@ export default function Step4Blueprint({ data, onChange, onCheckpointUpdate }: S
         setAuditComplete(resData.isComplete);
         setWarnings(resData.warnings || []);
         if (onCheckpointUpdate) {
-          onCheckpointUpdate(resData.score, resData.isComplete);
+          onCheckpointUpdate(resData.score, resData.isComplete, {
+            warnings: resData.warnings || [],
+            followUpQuestions: resData.followUpQuestions || [],
+            templates: resData.templates || []
+          });
         }
       }
     } catch (err) {
@@ -156,7 +188,7 @@ export default function Step4Blueprint({ data, onChange, onCheckpointUpdate }: S
 
       const resData = await res.json();
       const list = [...(data.floors || [])];
-      list[floorIndex] = { ...list[floorIndex], floorPlanPath: `/uploads/${resData.name}` };
+      list[floorIndex] = { ...list[floorIndex], floorPlanPath: resData.url || `/uploads/${resData.name}` };
       onChange({ ...data, floors: list });
       alert(`Floor ${floorIndex + 1} plan uploaded successfully!`);
     } catch (err: any) {
@@ -164,6 +196,74 @@ export default function Step4Blueprint({ data, onChange, onCheckpointUpdate }: S
     } finally {
       setUploadingFloor(null);
     }
+  };
+
+  // Save or update a block in the grid layout
+  const handleSaveBlock = () => {
+    if (!activeCellConfig) return;
+    const { floorIdx, x, y } = activeCellConfig;
+    const updatedFloors = [...(data.floors || [])];
+    const floor = { ...updatedFloors[floorIdx] };
+    const currentLayout = [...(floor.layout || [])];
+
+    // Find if a block already exists in this cell
+    const blockIndex = currentLayout.findIndex((b: any) => b.x === x && b.y === y);
+
+    const blockName = configBlockName.trim() || (configBlockType === "room" ? configRoomType : configFacilityName) || "Block";
+
+    const newBlock = {
+      id: `block-${floorIdx}-${x}-${y}-${Date.now()}`,
+      type: configBlockType,
+      name: blockName,
+      x,
+      y,
+      roomTypeName: configBlockType === "room" ? configRoomType : undefined,
+      facilityName: configBlockType === "facility" ? configFacilityName : undefined
+    };
+
+    if (blockIndex >= 0) {
+      currentLayout[blockIndex] = newBlock;
+    } else {
+      currentLayout.push(newBlock);
+    }
+
+    floor.layout = currentLayout;
+    updatedFloors[floorIdx] = floor;
+    onChange({ ...data, floors: updatedFloors });
+
+    // Reset config states
+    setActiveCellConfig(null);
+    setConfigBlockName("");
+  };
+
+  // Remove a block from the grid layout
+  const handleClearCell = (floorIdx: number, x: number, y: number) => {
+    const updatedFloors = [...(data.floors || [])];
+    const floor = { ...updatedFloors[floorIdx] };
+    const currentLayout = [...(floor.layout || [])];
+
+    const filteredLayout = currentLayout.filter((b: any) => !(b.x === x && b.y === y));
+
+    floor.layout = filteredLayout;
+    updatedFloors[floorIdx] = floor;
+    onChange({ ...data, floors: updatedFloors });
+  };
+
+  const getBlockDetails = (block: any) => {
+    if (!block) return { emoji: "➕", bg: "bg-slate-50 border-dashed border-slate-350 hover:bg-slate-100", textColor: "text-slate-400" };
+    if (block.type === "room") {
+      return { emoji: "🛏️", bg: "bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-750", textColor: "text-blue-750" };
+    }
+    const nameLower = (block.facilityName || block.name || "").toLowerCase();
+    let emoji = "🏢";
+    if (nameLower.includes("pool") || nameLower.includes("swim")) emoji = "🏊";
+    else if (nameLower.includes("restaurant") || nameLower.includes("food") || nameLower.includes("kitchen")) emoji = "🍽️";
+    else if (nameLower.includes("gym") || nameLower.includes("fitness")) emoji = "🏋️";
+    else if (nameLower.includes("bar") || nameLower.includes("lounge")) emoji = "🍸";
+    else if (nameLower.includes("spa") || nameLower.includes("massage") || nameLower.includes("sauna")) emoji = "🧖";
+    else if (nameLower.includes("lobby") || nameLower.includes("reception") || nameLower.includes("front")) emoji = "🚪";
+    
+    return { emoji, bg: "bg-purple-50 border-purple-200 hover:bg-purple-100 text-purple-750", textColor: "text-purple-750" };
   };
 
   const roomTypes = data.roomTypes || [];
@@ -349,8 +449,199 @@ export default function Step4Blueprint({ data, onChange, onCheckpointUpdate }: S
                     </div>
                   </div>
                 </div>
-
               </div>
+
+              {/* Visual Layout Map Designer Expandable */}
+              <div className="border-t border-slate-100 pt-6 mt-6">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-[11px] uppercase font-black text-slate-800 tracking-wider">Visual Map Layout designer</span>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedFloorLayout(expandedFloorLayout === fIdx ? null : fIdx)}
+                    className="text-xs bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-1.5 rounded-lg text-black font-bold transition flex items-center space-x-1"
+                  >
+                    <span>{expandedFloorLayout === fIdx ? "Hide Grid Designer ✕" : "🛠️ Open Grid Designer"}</span>
+                  </button>
+                </div>
+
+                {expandedFloorLayout === fIdx && (
+                  <div className="bg-slate-50 border border-slate-200 p-6 rounded-xl space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/60 pb-3">
+                      <div>
+                        <h6 className="text-xs font-black text-black">Interactive 6x6 Layout Grid</h6>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Click cells below to place configured rooms and facilities.</p>
+                      </div>
+                      <span className="text-[10px] bg-indigo-50 border border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-full font-bold">
+                        Blocks Placed: {(floor.layout || []).length}
+                      </span>
+                    </div>
+
+                    {/* Designer Workspace */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+                      {/* Grid View */}
+                      <div className="md:col-span-2 bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
+                        <div className="grid grid-cols-6 gap-2 aspect-[4/3] max-w-[480px] mx-auto">
+                          {Array.from({ length: 6 }).map((_, y) => 
+                            Array.from({ length: 6 }).map((_, x) => {
+                              const block = (floor.layout || []).find((b: any) => b.x === x && b.y === y);
+                              const details = getBlockDetails(block);
+                              return (
+                                <div
+                                  key={`${x}-${y}`}
+                                  className="aspect-square relative group"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveCellConfig({ floorIdx: fIdx, x, y });
+                                      if (block) {
+                                        setConfigBlockType(block.type);
+                                        setConfigRoomType(block.roomTypeName || "");
+                                        setConfigFacilityName(block.facilityName || "");
+                                        setConfigBlockName(block.name);
+                                      } else {
+                                        setConfigBlockType("room");
+                                        setConfigRoomType(roomTypes[0]?.name || "");
+                                        setConfigFacilityName(data.facilities?.[0]?.name || "");
+                                        setConfigBlockName("");
+                                      }
+                                    }}
+                                    className={`w-full h-full rounded-lg border-2 flex flex-col items-center justify-center p-1 transition cursor-pointer ${details.bg}`}
+                                  >
+                                    <span className="text-lg">{details.emoji}</span>
+                                    {block ? (
+                                      <span className="text-[9px] font-bold text-black truncate w-full text-center mt-1">
+                                        {block.name}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[8px] font-bold text-slate-400 mt-1 opacity-0 group-hover:opacity-100 transition">
+                                        ({x},{y})
+                                      </span>
+                                    )}
+                                  </button>
+                                  {block && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleClearCell(fIdx, x, y);
+                                      }}
+                                      className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] font-bold border border-rose-600 shadow-sm opacity-0 group-hover:opacity-100 transition cursor-pointer z-20"
+                                    >
+                                      ×
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Cell Block Configurator Panel */}
+                      <div className="bg-white border border-slate-200 p-4 rounded-xl space-y-4 shadow-sm h-full">
+                        <span className="block text-[10px] uppercase font-bold text-slate-800 border-b border-slate-200 pb-1.5">
+                          Configure Block
+                        </span>
+
+                        {activeCellConfig ? (
+                          <div className="space-y-3.5">
+                            <p className="text-[10px] font-bold text-black">
+                              Position: Column {activeCellConfig.x + 1}, Row {activeCellConfig.y + 1}
+                            </p>
+
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-bold text-slate-700 uppercase block">Block Type</label>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setConfigBlockType("room")}
+                                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition ${
+                                    configBlockType === "room" ? "bg-blue-600 border-blue-600 text-white" : "bg-white border-slate-200 text-black hover:bg-slate-50"
+                                  }`}
+                                >
+                                  Guestroom
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfigBlockType("facility")}
+                                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition ${
+                                    configBlockType === "facility" ? "bg-purple-600 border-purple-600 text-white" : "bg-white border-slate-200 text-black hover:bg-slate-50"
+                                  }`}
+                                >
+                                  Facility
+                                </button>
+                              </div>
+                            </div>
+
+                            {configBlockType === "room" ? (
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-bold text-slate-700 uppercase block">Room Type Profile</label>
+                                <select
+                                  value={configRoomType}
+                                  onChange={(e) => setConfigRoomType(e.target.value)}
+                                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold focus:outline-none"
+                                >
+                                  {roomTypes.map((rt: any) => (
+                                    <option key={rt.name} value={rt.name}>{rt.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-bold text-slate-700 uppercase block">Select Facility</label>
+                                <select
+                                  value={configFacilityName}
+                                  onChange={(e) => setConfigFacilityName(e.target.value)}
+                                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold focus:outline-none"
+                                >
+                                  {(data.facilities || []).map((fc: any) => (
+                                    <option key={fc.name} value={fc.name}>{fc.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-bold text-slate-700 uppercase block">Label / Room Number</label>
+                              <input
+                                type="text"
+                                placeholder={configBlockType === "room" ? "e.g. 101" : "e.g. Lobby"}
+                                value={configBlockName}
+                                onChange={(e) => setConfigBlockName(e.target.value)}
+                                className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-black focus:outline-none"
+                              />
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                              <button
+                                type="button"
+                                onClick={handleSaveBlock}
+                                className="flex-1 py-2 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
+                              >
+                                Save Block
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveCellConfig(null)}
+                                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-black text-xs font-bold rounded-lg cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-10 text-center text-slate-400 space-y-1">
+                            <span className="text-2xl">🖱️</span>
+                            <p className="text-[10px] font-medium leading-snug">Click any grid cell to begin laying out rooms and facilities.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
             </div>
           ))}
         </div>

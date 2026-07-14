@@ -20,25 +20,30 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     
-    // Ensure upload folder exists
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    // Save file locally
+    // Save file locally or fallback to base64 Data URL if filesystem is read-only (EROFS)
+    let filePathStr = '';
     const fileName = `${Date.now()}_${file.name}`;
-    const filePath = path.join(uploadDir, fileName);
-    fs.writeFileSync(filePath, buffer);
-
-    const relativePath = path.join('public', 'uploads', fileName);
+    
+    try {
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      const filePath = path.join(uploadDir, fileName);
+      fs.writeFileSync(filePath, buffer);
+      filePathStr = path.join('public', 'uploads', fileName);
+    } catch (fsError: any) {
+      console.warn('Failed to save file to local filesystem, falling back to base64 in database:', fsError.message || fsError);
+      const base64Data = buffer.toString('base64');
+      filePathStr = `data:${file.type};base64,${base64Data}`;
+    }
 
     // Save document details
     const doc = await prisma.hotelDocument.create({
       data: {
         hotelId: session.hotelId,
         name: file.name,
-        filePath: relativePath,
+        filePath: filePathStr,
         mimeType: file.type,
         status: 'PENDING',
       },
@@ -50,11 +55,16 @@ export async function POST(request: Request) {
       hotelId: session.hotelId,
     });
 
+    const publicUrl = doc.filePath.startsWith('data:') 
+      ? doc.filePath 
+      : '/' + doc.filePath.replace(/\\/g, '/').replace(/^public\//, '');
+
     return NextResponse.json({
       message: 'File uploaded and queued successfully.',
       documentId: doc.id,
       name: doc.name,
       status: doc.status,
+      url: publicUrl,
     });
   } catch (error: any) {
     console.error('File upload processing failed:', error);
@@ -82,10 +92,12 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Document not found.' }, { status: 404 });
     }
 
-    // Delete local file
-    const absolutePath = path.resolve(doc.filePath);
-    if (fs.existsSync(absolutePath)) {
-      fs.unlinkSync(absolutePath);
+    // Delete local file if not a data URL
+    if (!doc.filePath.startsWith('data:')) {
+      const absolutePath = path.resolve(doc.filePath);
+      if (fs.existsSync(absolutePath)) {
+        fs.unlinkSync(absolutePath);
+      }
     }
 
     // Delete database record

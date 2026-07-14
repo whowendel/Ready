@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { assignTaskDynamically } from '@/lib/dispatcher';
+import { formatPHTDate, getPHTTimestamp } from '@/lib/time';
 
 export async function GET() {
   try {
@@ -53,31 +54,37 @@ export async function POST(request: Request) {
       // Not a JSON text, treat text as raw transcript
     }
 
-    // Process audio using Gemini if available
-    if (base64Audio && base64Audio.startsWith('data:')) {
-      const matches = base64Audio.match(/^data:([^;]+);base64,(.*)$/);
-      if (matches && matches.length === 3) {
-        const mimeType = matches[1];
-        const rawBase64 = matches[2];
+    let isWorkRelated = true;
+    let summaryText = "";
+    let isTask = false;
+    let taskDetails: any = null;
 
-        const apiKey = process.env.GEMINI_ROUTING_API_KEY || process.env.GEMINI_API_KEY;
-        if (apiKey) {
-          try {
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-            const model = genAI.getGenerativeModel({
-              model: modelName,
-              generationConfig: { responseMimeType: 'application/json' },
-            });
+    const apiKey = process.env.GEMINI_ROUTING_API_KEY || process.env.GEMINI_API_KEY;
+    if (apiKey) {
+      try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: { responseMimeType: 'application/json' },
+        });
+
+        if (base64Audio && base64Audio.startsWith('data:')) {
+          const matches = base64Audio.match(/^data:([^;]+);base64,(.*)$/);
+          if (matches && matches.length === 3) {
+            const mimeType = matches[1];
+            const rawBase64 = matches[2];
 
             const prompt = `
 You are the READY AI Walkie-Talkie Coordinator. You have received a push-to-talk audio clip from a hotel worker.
 Your jobs:
 1. Transcribe the audio message verbatim in English (translate if it's in another language like Filipino).
-2. Determine if the message indicates a new task request or update that needs ticketing.
+2. Determine if the conversation is work-related. Work-related means it talks about tasks, guest requests, hotel operations, shift handovers, worker availability, or security reports. Random chatter (like food preferences, greetings, non-work plans, or off-topic jokes) is non-work-related.
+3. Generate a short, concise summary (5-10 words) of what the message is about (e.g., "Guest requesting extra towels", "Checking in for shift").
+4. Determine if the message indicates a new task request or update that needs ticketing.
    - For example: "Room 304 needs towels" or "Lobby light bulb is broken" -> Task request.
    - For example: "I am going on break" or "Roger that" -> NOT a task request.
-3. If it is a task request, extract:
+5. If it is a task request, extract:
    - "taskName": A short, clear task name (e.g. "Towel Delivery", "Light Bulb Replacement").
    - "department": One of: ["Front Desk", "Housekeeping", "Maintenance", "Food & Beverage", "Security", "Laundry"].
    - "difficulty": Workload difficulty 1-5.
@@ -88,6 +95,8 @@ Your jobs:
 Your response must be a single valid JSON object matching this exact schema:
 {
   "transcript": "Verbatim transcript of the voice message",
+  "isWorkRelated": boolean,
+  "summary": "Short 5-10 word summary",
   "isTask": boolean,
   "taskDetails": {
     "taskName": "Concise task name",
@@ -114,53 +123,98 @@ Your response must be a single valid JSON object matching this exact schema:
             if (parsedRes.transcript) {
               transcriptText = parsedRes.transcript;
             }
-
-            if (parsedRes.isTask && parsedRes.taskDetails) {
-              const details = parsedRes.taskDetails;
-              const ticketId = `TKT-${Math.floor(1000 + Math.random() * 9000)}-${hotelId}`;
-
-              const { workerId, isOverloaded } = await assignTaskDynamically(hotelId, details.department, {
-                name: details.taskName,
-                difficulty: details.difficulty || 2,
-                priority: details.priority || 'MEDIUM',
-                room: details.room || 'General Area',
-                slaMinutes: details.slaMinutes || 30
-              });
-
-              await prisma.task.create({
-                data: {
-                  id: ticketId,
-                  name: details.taskName,
-                  dept: details.department,
-                  room: details.room || 'General Area',
-                  difficulty: details.difficulty || 2,
-                  priority: details.priority || 'MEDIUM',
-                  slaMinutes: details.slaMinutes || 30,
-                  status: workerId ? 'in_progress' : 'backlog',
-                  createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                  workerId,
-                  isOverloaded,
-                  hotelId
-                }
-              });
-            }
-          } catch (aiErr) {
-            console.error('Gemini audio transcription failed:', aiErr);
+            isWorkRelated = parsedRes.isWorkRelated !== undefined ? parsedRes.isWorkRelated : true;
+            summaryText = parsedRes.summary || "";
+            isTask = !!parsedRes.isTask;
+            taskDetails = parsedRes.taskDetails;
           }
+        } else {
+          // Text-only transcript flow
+          const textPrompt = `
+You are the READY AI Walkie-Talkie Coordinator. You have received a text walkie-talkie message: "${transcriptText}"
+
+Evaluate the message and return:
+1. "isWorkRelated": boolean. True if it relates to hotel operations, tasks, shift updates, safety, etc. False if it is unrelated social chatter (e.g., "what is for lunch", "great weather", jokes, greetings).
+2. "summary": A short, concise summary (5-10 words) of what the message is about (e.g., "Guest requesting extra towels", "Checking in for shift").
+3. "isTask": boolean. True if the text requests a new operational task that requires dispatch.
+4. "taskDetails": If isTask is true, extract department, taskName, difficulty, priority, slaMinutes, room.
+
+Your response must be a single valid JSON object matching this exact schema:
+{
+  "isWorkRelated": boolean,
+  "summary": "Short 5-10 word summary",
+  "isTask": boolean,
+  "taskDetails": {
+    "taskName": "Concise task name",
+    "department": "Housekeeping",
+    "difficulty": number,
+    "priority": "LOW",
+    "slaMinutes": number,
+    "room": "Room number"
+  } | null
+}
+`;
+
+          const result = await model.generateContent(textPrompt);
+          const parsedRes = JSON.parse(result.response.text());
+          isWorkRelated = parsedRes.isWorkRelated !== undefined ? parsedRes.isWorkRelated : true;
+          summaryText = parsedRes.summary || "";
+          isTask = !!parsedRes.isTask;
+          taskDetails = parsedRes.taskDetails;
         }
+
+        // If a task needs creation
+        if (isWorkRelated && isTask && taskDetails) {
+          const details = taskDetails;
+          const ticketId = `TKT-${Math.floor(1000 + Math.random() * 9000)}-${hotelId}`;
+
+          const { workerId, isOverloaded } = await assignTaskDynamically(hotelId, details.department, {
+            name: details.taskName,
+            difficulty: details.difficulty || 2,
+            priority: details.priority || 'MEDIUM',
+            room: details.room || 'General Area',
+            slaMinutes: details.slaMinutes || 30
+          });
+
+          await prisma.task.create({
+            data: {
+              id: ticketId,
+              name: details.taskName,
+              dept: details.department,
+              room: details.room || 'General Area',
+              difficulty: details.difficulty || 2,
+              priority: details.priority || 'MEDIUM',
+              slaMinutes: details.slaMinutes || 30,
+              status: workerId ? 'in_progress' : 'backlog',
+              createdAt: formatPHTDate(),
+              workerId,
+              isOverloaded,
+              hotelId
+            }
+          });
+        }
+      } catch (aiErr) {
+        console.error('Gemini voice/text processing failed:', aiErr);
       }
     }
 
-    const pttSaveText = base64Audio
-      ? JSON.stringify({ text: transcriptText, audio: base64Audio })
-      : text;
+    // DISCARD check: if the conversation is determined to be non-work-related, return immediately without saving
+    if (!isWorkRelated) {
+      return NextResponse.json({ success: true, discarded: true, message: 'Message filtered and discarded as non-work-related.' });
+    }
+
+    const pttSaveText = JSON.stringify({ 
+      text: transcriptText, 
+      audio: base64Audio, 
+      summary: summaryText 
+    });
 
     const clip = await prisma.pttClip.create({
       data: {
         sender: sender || 'Staff Member',
         duration: duration || '0:05',
         text: pttSaveText,
-        timestamp: timestamp || 'Just now',
+        timestamp: timestamp || getPHTTimestamp(),
         hotelId
       }
     });

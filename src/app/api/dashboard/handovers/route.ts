@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
+import { getPHTTimestamp } from '@/lib/time';
 
 const defaultHandovers = [
   { author: "Maria (Morning Crew)", text: "Vacuum cleaner in Lobby is losing suction, needs a quick nozzle check from Maintenance.", time: "Jul 2, 2026, 02:00 PM" },
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
       data: {
         author: author || 'Staff Member',
         text,
-        time: time || new Date().toLocaleString(),
+        time: time || getPHTTimestamp(),
         hotelId
       }
     });

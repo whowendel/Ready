@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { assignTaskDynamically } from '@/lib/dispatcher';
+import { formatPHTDate } from '@/lib/time';
 
 const promptTemplate = (text: string) => `
 You are the READY AI Smart Dispatcher. Guest request: "${text}"
@@ -207,7 +208,7 @@ export async function POST(request: Request) {
         priority,
         slaMinutes,
         status: workerId ? 'in_progress' : 'backlog',
-        createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        createdAt: formatPHTDate(),
         workerId,
         isOverloaded,
         hotelId

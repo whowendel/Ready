@@ -5,10 +5,11 @@ import { useState, useEffect } from "react";
 interface Step5Props {
   data: any;
   onChange: (newData: any) => void;
-  onCheckpointUpdate?: (score: number, isComplete: boolean) => void;
+  onCheckpointUpdate?: (score: number, isComplete: boolean, auditData?: any) => void;
+  auditState?: any;
 }
 
-export default function Step5Readiness({ data, onChange, onCheckpointUpdate }: Step5Props) {
+export default function Step5Readiness({ data, onChange, onCheckpointUpdate, auditState }: Step5Props) {
   // Checkpoint State
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditScore, setAuditScore] = useState<number>(0);
@@ -16,7 +17,20 @@ export default function Step5Readiness({ data, onChange, onCheckpointUpdate }: S
   const [warnings, setWarnings] = useState<string[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
 
-
+  // Sync with parent auditState
+  useEffect(() => {
+    if (auditState) {
+      setAuditScore(auditState.score || 0);
+      setAuditComplete(auditState.isComplete || false);
+      setWarnings(auditState.warnings || []);
+      setTemplates(auditState.templates || []);
+    } else {
+      setAuditScore(0);
+      setAuditComplete(false);
+      setWarnings([]);
+      setTemplates([]);
+    }
+  }, [auditState]);
 
   const runPhaseAudit = async () => {
     setIsAuditing(true);
@@ -27,7 +41,11 @@ export default function Step5Readiness({ data, onChange, onCheckpointUpdate }: S
         setAuditComplete(true);
         setWarnings([]);
         if (onCheckpointUpdate) {
-          onCheckpointUpdate(100, true);
+          onCheckpointUpdate(100, true, {
+            warnings: [],
+            followUpQuestions: [],
+            templates: []
+          });
         }
         return;
       }
@@ -44,7 +62,11 @@ export default function Step5Readiness({ data, onChange, onCheckpointUpdate }: S
         setWarnings(resData.warnings || []);
         setTemplates(resData.templates || []);
         if (onCheckpointUpdate) {
-          onCheckpointUpdate(resData.score, resData.isComplete);
+          onCheckpointUpdate(resData.score, resData.isComplete, {
+            warnings: resData.warnings || [],
+            followUpQuestions: resData.followUpQuestions || [],
+            templates: resData.templates || []
+          });
         }
       }
     } catch (err) {

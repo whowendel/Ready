@@ -5,9 +5,10 @@ import { useState, useEffect } from "react";
 interface Step3Props {
   data: any;
   onChange: (newData: any) => void;
-  onCheckpointUpdate?: (score: number, isComplete: boolean) => void;
+  onCheckpointUpdate?: (score: number, isComplete: boolean, auditData?: any) => void;
   mode?: "choose" | "configure";
   selectedDeptName?: string;
+  auditState?: any;
 }
 
 const foodImagePresets: Record<string, string> = {
@@ -104,7 +105,7 @@ const predefinedTasksMap: Record<string, Array<{ name: string; description: stri
   ]
 };
 
-export default function Step3Rooms({ data, onChange, onCheckpointUpdate, mode = "choose", selectedDeptName }: Step3Props) {
+export default function Step3Rooms({ data, onChange, onCheckpointUpdate, mode = "choose", selectedDeptName, auditState }: Step3Props) {
   // Checkpoint State
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditScore, setAuditScore] = useState<number>(0);
@@ -133,10 +134,25 @@ export default function Step3Rooms({ data, onChange, onCheckpointUpdate, mode = 
     return d.name?.trim().length > 0 && wc > 0 && hasShifts && hasTasks;
   };
 
-  // Trigger phase audit on mount and dependencies change
+  // Sync with parent auditState
   useEffect(() => {
-    runPhaseAudit();
-  }, [data.departments, selectedDeptName, mode]);
+    if (auditState) {
+      setAuditScore(auditState.score || 0);
+      setAuditComplete(auditState.isComplete || false);
+      setWarnings(auditState.warnings || []);
+    } else {
+      setAuditScore(0);
+      setAuditComplete(false);
+      setWarnings([]);
+    }
+  }, [auditState]);
+
+  // Trigger phase audit on mount and dependencies change (only if no cached auditState)
+  useEffect(() => {
+    if (!auditState) {
+      runPhaseAudit();
+    }
+  }, [data.departments, selectedDeptName, mode, auditState]);
 
   const runPhaseAudit = async () => {
     const bypassActive = localStorage.getItem("aiBypass") === "true";
@@ -145,7 +161,11 @@ export default function Step3Rooms({ data, onChange, onCheckpointUpdate, mode = 
       setAuditComplete(true);
       setWarnings([]);
       if (onCheckpointUpdate) {
-        onCheckpointUpdate(100, true);
+        onCheckpointUpdate(100, true, {
+          warnings: [],
+          followUpQuestions: [],
+          templates: []
+        });
       }
       return;
     }
@@ -156,7 +176,11 @@ export default function Step3Rooms({ data, onChange, onCheckpointUpdate, mode = 
       setAuditComplete(hasDepts);
       setWarnings([]);
       if (onCheckpointUpdate) {
-        onCheckpointUpdate(hasDepts ? 100 : 0, hasDepts);
+        onCheckpointUpdate(hasDepts ? 100 : 0, hasDepts, {
+          warnings: [],
+          followUpQuestions: [],
+          templates: []
+        });
       }
       return;
     }
@@ -178,7 +202,11 @@ export default function Step3Rooms({ data, onChange, onCheckpointUpdate, mode = 
       setWarnings(missing);
 
       if (onCheckpointUpdate) {
-        onCheckpointUpdate(valid ? 100 : 0, valid);
+        onCheckpointUpdate(valid ? 100 : 0, valid, {
+          warnings: missing,
+          followUpQuestions: [],
+          templates: []
+        });
       }
       return;
     }
@@ -196,7 +224,11 @@ export default function Step3Rooms({ data, onChange, onCheckpointUpdate, mode = 
         setAuditComplete(resData.isComplete);
         setWarnings(resData.warnings || []);
         if (onCheckpointUpdate) {
-          onCheckpointUpdate(resData.score, resData.isComplete);
+          onCheckpointUpdate(resData.score, resData.isComplete, {
+            warnings: resData.warnings || [],
+            followUpQuestions: resData.followUpQuestions || [],
+            templates: resData.templates || []
+          });
         }
       }
     } catch (err) {
