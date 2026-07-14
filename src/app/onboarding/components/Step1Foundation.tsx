@@ -24,11 +24,29 @@ export default function Step1Foundation({ data, onChange, hotelId, onCheckpointU
 
   // Poll status of uploads
   useEffect(() => {
+    let lastCompletedCount = 0;
     const fetchStatus = () => {
       fetch("/api/onboarding/status")
         .then((res) => res.json())
         .then((resData) => {
-          setDocuments(resData.documents || []);
+          const docs = resData.documents || [];
+          setDocuments(docs);
+          
+          const completedCount = docs.filter((d: any) => d.status === "COMPLETED").length;
+          if (completedCount > lastCompletedCount) {
+            fetch("/api/onboarding/session")
+              .then((res) => res.json())
+              .then((sessionData) => {
+                if (sessionData && sessionData.data) {
+                  onChange({
+                    ...data,
+                    ...sessionData.data
+                  });
+                }
+              })
+              .catch(console.error);
+          }
+          lastCompletedCount = completedCount;
         })
         .catch(console.error);
     };
@@ -36,7 +54,7 @@ export default function Step1Foundation({ data, onChange, hotelId, onCheckpointU
     fetchStatus();
     const interval = setInterval(fetchStatus, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [data, onChange]);
 
   // Sync with parent auditState
   useEffect(() => {

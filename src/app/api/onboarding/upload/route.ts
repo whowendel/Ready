@@ -49,21 +49,47 @@ export async function POST(request: Request) {
       },
     });
 
-    // Enqueue document processing task
-    await getDocumentQueue().add('process-document', {
-      documentId: doc.id,
-      hotelId: session.hotelId,
-    });
+    // Enqueue document processing task or run inline in serverless
+    const isServerless = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined || !process.env.REDIS_URL;
+    let queued = false;
+    let finalStatus = 'PENDING';
+
+    if (!isServerless) {
+      try {
+        await getDocumentQueue().add('process-document', {
+          documentId: doc.id,
+          hotelId: session.hotelId,
+        });
+        queued = true;
+      } catch (queueError: any) {
+        console.warn('Failed to enqueue document processing task, falling back to inline:', queueError.message || queueError);
+      }
+    }
+
+    if (isServerless || !queued) {
+      try {
+        const { processDocumentInline } = await import('@/lib/documentProcessor');
+        await processDocumentInline(doc.id, session.hotelId);
+        finalStatus = 'COMPLETED';
+      } catch (procError: any) {
+        console.error('Inline document processing failed:', procError);
+        finalStatus = 'FAILED';
+      }
+    }
 
     const publicUrl = doc.filePath.startsWith('data:') 
       ? doc.filePath 
       : '/' + doc.filePath.replace(/\\/g, '/').replace(/^public\//, '');
 
     return NextResponse.json({
-      message: 'File uploaded and queued successfully.',
+      message: finalStatus === 'COMPLETED'
+        ? 'File uploaded and processed inline successfully.'
+        : finalStatus === 'FAILED'
+        ? 'File uploaded but processing failed.'
+        : 'File uploaded and queued successfully.',
       documentId: doc.id,
       name: doc.name,
-      status: doc.status,
+      status: finalStatus,
       url: publicUrl,
     });
   } catch (error: any) {
