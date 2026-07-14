@@ -23,21 +23,28 @@ const getRedisOptions = () => {
 
 export const redisConnectionOptions = getRedisOptions();
 
-const globalForQueue = global as unknown as { documentQueue: Queue };
+let queueInstance: Queue | null = null;
 
-export const documentQueue =
-  globalForQueue.documentQueue ||
-  new Queue('document-processing', {
-    connection: redisConnectionOptions,
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 5000,
-      },
-    },
-  });
+export const getDocumentQueue = (): Queue => {
+  if (!queueInstance) {
+    const globalForQueue = global as unknown as { documentQueue: Queue };
+    queueInstance =
+      globalForQueue.documentQueue ||
+      new Queue('document-processing', {
+        connection: redisConnectionOptions,
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 5000,
+          },
+        },
+      });
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForQueue.documentQueue = documentQueue;
-}
+    if (process.env.NODE_ENV !== 'production') {
+      globalForQueue.documentQueue = queueInstance;
+    }
+  }
+  return queueInstance;
+};
+

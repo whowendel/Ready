@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getOrCreateDevSession } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
-import { documentQueue } from '@/lib/queue';
+import { getDocumentQueue } from '@/lib/queue';
 import fs from 'fs';
 import path from 'path';
 
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     });
 
     // Enqueue document processing task
-    await documentQueue.add('process-document', {
+    await getDocumentQueue().add('process-document', {
       documentId: doc.id,
       hotelId: session.hotelId,
     });
