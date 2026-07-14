@@ -48,7 +48,7 @@ export default function Phase2OnboardingChassis() {
     document.documentElement.classList.remove("dark");
     document.documentElement.classList.remove("dark");
 
-    // AI Bypass setup
+    // AI Bypass setup restored
     const savedBypass = localStorage.getItem("aiBypass") === "true";
     setAiBypass(savedBypass);
 
@@ -115,9 +115,9 @@ export default function Phase2OnboardingChassis() {
 
     // Add Executive Hotel Manager
     mockEmployees.push({
-      firstName: "Amihan",
+      firstName: "Marriott",
       lastName: "GM",
-      email: "admin@nexus.com",
+      email: "admin@clarkmarriott.com",
       mobileNumber: "+63 917 000 9999",
       department: "Front Desk",
       role: "Hotel Manager"

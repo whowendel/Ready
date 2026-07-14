@@ -151,7 +151,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-slate-900/50 py-8 px-6 text-center text-xs text-slate-600">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-          <p>© {new Date().getFullYear()} READY - Team Nexus Ready. Filipino Hospitality Scaled with Care.</p>
+          <p>© {new Date().getFullYear()} READY - Scaled Filipino Hospitality.</p>
           <div className="flex space-x-6 text-slate-500">
             <a href="https://nextjs.org" className="hover:text-slate-400">Next.js</a>
             <a href="https://prisma.io" className="hover:text-slate-400">Prisma</a>

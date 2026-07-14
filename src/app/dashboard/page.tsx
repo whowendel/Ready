@@ -469,7 +469,7 @@ export default function OperationsDashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          author: "Nexus Admin",
+          author: hotelInfo?.name ? `${hotelInfo.name} Admin` : "Marriott Admin",
           text: newHandover.trim(),
           time: `${formattedDate}, ${formattedTime}`
         })
@@ -1170,9 +1170,13 @@ export default function OperationsDashboard() {
                         );
                       })()}
                     </div>
-                    {/* Visual bar representation of 8 hours */}
                     <div className="relative h-6 bg-slate-250/40 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-between px-3 text-[10px] font-bold text-slate-800">
-                      <div className="absolute top-0 bottom-0 left-0 w-[33%] bg-blue-600 border-r border-blue-500 opacity-20 animate-pulse" />
+                      <div className={`absolute top-0 bottom-0 left-0 w-[33%] bg-blue-600 border-r border-blue-500 opacity-20 ${
+                        (() => {
+                          const h = getCurrentPHTHour();
+                          return (h >= 6 && h < 14) ? "animate-pulse" : "";
+                        })()
+                      }`} />
                       <span className="z-10">06:00</span>
                       <span className="z-10">09:00</span>
                       <span className="z-10">12:00</span>
@@ -1214,9 +1218,13 @@ export default function OperationsDashboard() {
                         );
                       })()}
                     </div>
-                    {/* Visual bar representation of 8 hours */}
                     <div className="relative h-6 bg-slate-250/40 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-between px-3 text-[10px] font-bold text-slate-800">
-                      <div className="absolute top-0 bottom-0 left-0 w-[50%] bg-blue-600 border-r border-blue-500 opacity-20 animate-pulse" />
+                      <div className={`absolute top-0 bottom-0 left-0 w-[50%] bg-blue-600 border-r border-blue-500 opacity-20 ${
+                        (() => {
+                          const h = getCurrentPHTHour();
+                          return (h >= 14 && h < 22) ? "animate-pulse" : "";
+                        })()
+                      }`} />
                       <span className="z-10">14:00</span>
                       <span className="z-10">17:00</span>
                       <span className="z-10">20:00</span>
@@ -1258,9 +1266,13 @@ export default function OperationsDashboard() {
                         );
                       })()}
                     </div>
-                    {/* Visual bar representation of 8 hours */}
                     <div className="relative h-6 bg-slate-250/40 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-between px-3 text-[10px] font-bold text-slate-800">
-                      <div className="absolute top-0 bottom-0 left-0 w-[20%] bg-blue-600 border-r border-blue-500 opacity-20 animate-pulse" />
+                      <div className={`absolute top-0 bottom-0 left-0 w-[20%] bg-blue-600 border-r border-blue-500 opacity-20 ${
+                        (() => {
+                          const h = getCurrentPHTHour();
+                          return (h >= 22 || h < 6) ? "animate-pulse" : "";
+                        })()
+                      }`} />
                       <span className="z-10">22:00</span>
                       <span className="z-10">01:00</span>
                       <span className="z-10">04:00</span>

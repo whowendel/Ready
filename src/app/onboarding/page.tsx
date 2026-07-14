@@ -94,19 +94,9 @@ export default function OnboardingChassis() {
     localStorage.setItem("theme", "light");
     document.documentElement.classList.remove("dark");
 
-    // AI Bypass setup
+    // AI Bypass setup restored
     const savedBypass = localStorage.getItem("aiBypass") === "true";
     setAiBypass(savedBypass);
-
-    // Load validated steps cache from localStorage
-    const savedValidated = localStorage.getItem("onboarding_validated_steps");
-    if (savedValidated) {
-      try {
-        setValidatedSteps(JSON.parse(savedValidated));
-      } catch (e) {
-        console.error("Failed to parse validated steps", e);
-      }
-    }
 
     // Fetch draft session
     fetch("/api/onboarding/session")
@@ -116,6 +106,34 @@ export default function OnboardingChassis() {
         const stepNum = resData.step || 1;
         const stepKey = stepNumberToKey[stepNum] || "foundation";
         setActiveStep(stepKey);
+
+        const activeDepts = resData.data?.departments || [];
+        const baseSteps = ["foundation", "services", "choose_depts"];
+        const deptSteps = activeDepts.map((d: any) => `dept_${d.name.toLowerCase()}`);
+        const finalSteps = [...baseSteps, ...deptSteps, "blueprint", "policies", "ops_blueprint"];
+        const activeIdx = finalSteps.indexOf(stepKey);
+
+        const savedValidated = localStorage.getItem("onboarding_validated_steps");
+        if (savedValidated) {
+          try {
+            const parsed = JSON.parse(savedValidated);
+            const filtered: Record<string, any> = {};
+            Object.entries(parsed).forEach(([key, val]) => {
+              const idx = finalSteps.indexOf(key);
+              if (idx >= 0 && idx < activeIdx) {
+                filtered[key] = val;
+              }
+            });
+            setValidatedSteps(filtered);
+            localStorage.setItem("onboarding_validated_steps", JSON.stringify(filtered));
+          } catch (e) {
+            localStorage.removeItem("onboarding_validated_steps");
+            setValidatedSteps({});
+          }
+        } else {
+          setValidatedSteps({});
+        }
+
         if (resData.data) {
           setDraftData((prev: any) => ({
             ...prev,

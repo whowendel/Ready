@@ -96,6 +96,9 @@ export async function POST(request: Request) {
       await tx.onboardingSession.deleteMany({
         where: { hotelId }
       });
+    }, {
+      maxWait: 20000,
+      timeout: 60000,
     });
 
     // 6. Refresh cookies with finalized operational flags

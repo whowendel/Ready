@@ -127,7 +127,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={roleType === "worker" ? "worker@hotel.com" : "admin@nexus.com"}
+                placeholder={roleType === "worker" ? "worker@hotel.com" : "admin@clarkmarriott.com"}
                 className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs text-black font-semibold focus:outline-none focus:border-blue-400"
               />
             </div>

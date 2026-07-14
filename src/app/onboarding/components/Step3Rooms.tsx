@@ -544,537 +544,569 @@ export default function Step3Rooms({ data, onChange, onCheckpointUpdate, mode = 
   return (
     <div className="space-y-8 animate-fade-in text-black">
       <div className="border-b border-slate-200 pb-4">
-        <h2 className="text-xl font-bold mb-1">{dept.name} Setup Workspace</h2>
-        <p className="text-sm text-slate-500 font-medium">Establish roles, shifts, and task checklists for {dept.name} operations.</p>
+        <div className="flex items-center space-x-3">
+          <span className="text-2xl">⚙️</span>
+          <div>
+            <h2 className="text-xl font-bold mb-1">{dept.name} Workspace</h2>
+            <p className="text-sm text-slate-500 font-medium">Establish roles, shifts, and task checklists for {dept.name} operations.</p>
+          </div>
+        </div>
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-6 shadow-sm animate-fade-in">
-        <div className="flex justify-between items-center border-b border-slate-200 pb-3">
-          <h4 className="text-sm font-bold uppercase tracking-wider text-slate-900">{dept.name} Operations Workspace</h4>
-          <span className="text-[10px] text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full font-bold">ACTIVE DEPT</span>
+      {/* CARD 1: Workforce Positions & Headcounts */}
+      <div className="bg-white p-8 rounded-2xl border border-slate-200 space-y-6 shadow-sm">
+        <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+              <span>👥</span>
+              <span>Workforce Positions & Headcounts</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">Define the specific job roles and planned staffing levels for this division.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const currentPositions = dept.positions || [{ name: "Staff", count: dept.workerCount || 5 }];
+              const updated = [...currentPositions, { name: "New Position", count: 1 }];
+              const newTotal = updated.reduce((acc: number, p: any) => acc + (parseInt(p.count) || 0), 0);
+              handleUpdateDeptFields(dept.name, {
+                positions: updated,
+                workerCount: newTotal
+              });
+            }}
+            className="px-4 py-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-600 text-xs font-bold rounded-xl shadow-sm transition"
+          >
+            ➕ Add Position
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column: Workers & Shifts */}
-          <div className="space-y-6">
-            {/* Positions Configuration breakdown */}
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <label className="block text-[10px] uppercase font-bold text-slate-800">Workforce Roles & Headcounts</label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const currentPositions = dept.positions || [{ name: "Staff", count: dept.workerCount || 5 }];
-                    const updated = [...currentPositions, { name: "New Position", count: 1 }];
-                    const newTotal = updated.reduce((acc: number, p: any) => acc + (parseInt(p.count) || 0), 0);
-                    handleUpdateDeptFields(dept.name, {
-                      positions: updated,
-                      workerCount: newTotal
-                    });
-                  }}
-                  className="text-[10px] text-indigo-650 hover:text-indigo-505 font-bold"
-                >
-                  + Add Position
-                </button>
-              </div>
-              <div className="space-y-2 bg-slate-50 p-3.5 border border-slate-200 rounded-xl shadow-inner">
-                {((dept.positions && dept.positions.length > 0) ? dept.positions : [{ name: "Staff", count: dept.workerCount || 5 }]).map((pos: any, pIdx: number) => (
-                  <div key={pIdx} className="flex items-center space-x-2">
-                    <input
-                      type="text"
-                      value={pos.name}
-                      onChange={(e) => {
-                        const currentPositions = dept.positions || [{ name: "Staff", count: dept.workerCount || 5 }];
-                        const updated = [...currentPositions];
-                        updated[pIdx] = { ...updated[pIdx], name: e.target.value };
-                        handleUpdateDeptField(dept.name, "positions", updated);
-                      }}
-                      placeholder="Position Name (e.g. Room Attendant)"
-                      className="flex-1 bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-black focus:outline-none"
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      value={pos.count === 0 && pos.count !== "" ? "" : pos.count}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const countVal = val === "" ? "" : parseInt(val) || 0;
-                        const currentPositions = dept.positions || [{ name: "Staff", count: dept.workerCount || 5 }];
-                        const updated = [...currentPositions];
-                        updated[pIdx] = { ...updated[pIdx], count: countVal };
-                        const newTotal = updated.reduce((acc: number, p: any) => acc + (parseInt(p.count) || 0), 0);
-                        handleUpdateDeptFields(dept.name, {
-                          positions: updated,
-                          workerCount: newTotal
-                        });
-                      }}
-                      placeholder="Qty"
-                      className="w-16 bg-white border border-slate-200 rounded px-2 py-1.5 text-xs text-black text-center focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const currentPositions = dept.positions || [{ name: "Staff", count: dept.workerCount || 5 }];
-                        const updated = [...currentPositions];
-                        updated.splice(pIdx, 1);
-                        const newTotal = updated.reduce((acc: number, p: any) => acc + (parseInt(p.count) || 0), 0);
-                        handleUpdateDeptFields(dept.name, {
-                          positions: updated,
-                          workerCount: newTotal
-                        });
-                      }}
-                      className="text-slate-400 hover:text-rose-500 text-xs ml-1"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                ))}
-                <div className="pt-2.5 border-t border-slate-200 flex justify-between items-center text-xs font-bold text-slate-800">
-                  <span>Total Calculated Headcount:</span>
-                  <span>{dept.workerCount || 0} active workers</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Shifts Schedule details */}
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <label className="block text-[10px] uppercase font-bold text-slate-800">Shift Rosters</label>
-                <button
-                  onClick={() => handleAddShift(dept.name)}
-                  className="text-[10px] text-indigo-650 hover:text-indigo-505 font-bold"
-                >
-                  + Add Shift
-                </button>
-              </div>
-              <div className="space-y-2 bg-slate-50 p-3.5 border border-slate-200 rounded-xl max-h-[180px] overflow-y-auto pr-1">
-                {(dept.shifts || []).length === 0 ? (
-                  <p className="text-[10px] text-slate-450 italic py-1">No shifts configured. Add a shift roster.</p>
-                ) : (
-                  (dept.shifts || []).map((shift: any, sIdx: number) => (
-                    <div key={sIdx} className="flex items-center space-x-2 bg-white border border-slate-200 rounded-lg p-2 relative">
-                      <input
-                        type="text"
-                        value={shift.name}
-                        onChange={(e) => handleUpdateShiftField(dept.name, sIdx, "name", e.target.value)}
-                        placeholder="Shift Name"
-                        className="flex-1 bg-transparent text-xs font-bold text-black focus:outline-none"
-                      />
-                      <div className="flex items-center space-x-1.5 text-xs text-slate-655">
-                        <input
-                          type="time"
-                          value={shift.open}
-                          onChange={(e) => handleUpdateShiftField(dept.name, sIdx, "open", e.target.value)}
-                          className="bg-transparent border border-slate-200 rounded px-1 text-xs text-black"
-                        />
-                        <span>to</span>
-                        <input
-                          type="time"
-                          value={shift.close}
-                          onChange={(e) => handleUpdateShiftField(dept.name, sIdx, "close", e.target.value)}
-                          className="bg-transparent border border-slate-200 rounded px-1 text-xs text-black"
-                        />
-                      </div>
-                      <button
-                        onClick={() => handleRemoveShift(dept.name, sIdx)}
-                        className="text-slate-400 hover:text-rose-500 text-xs ml-2"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Predefined Tasks */}
-          <div className="space-y-6">
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <label className="block text-[10px] uppercase font-bold text-slate-800">Task Directories</label>
-                <button
-                  onClick={() => handleFetchAIDiscovery(dept.name)}
-                  disabled={isLoadingAI[dept.name]}
-                  className="text-[10px] text-indigo-700 hover:text-indigo-505 font-bold flex items-center space-x-1 disabled:opacity-50"
-                >
-                  <span>🤖</span>
-                  <span>{isLoadingAI[dept.name] ? "Tailoring..." : "Tailored AI Discovery"}</span>
-                </button>
-              </div>
-
-              {predefined.length > 0 && (
-                <div className="bg-slate-50 p-4 border border-slate-200 rounded-xl space-y-2">
-                  <span className="block text-[9px] uppercase font-bold text-slate-800">Predefined Department Tasks Checklist:</span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {predefined.map((pTask) => {
-                      const isChecked = selectedTasks.some((t: any) => t.name.toLowerCase() === pTask.name.toLowerCase());
-                      return (
-                        <div 
-                          key={pTask.name}
-                          onClick={() => handleTogglePredefinedTask(dept.name, pTask, !isChecked)}
-                          className={`flex items-center space-x-2 text-[11px] text-slate-800 cursor-pointer p-1.5 rounded transition ${
-                            isChecked ? "bg-indigo-50/70 font-semibold" : "hover:bg-slate-100"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {}}
-                            className="accent-indigo-600 rounded border-slate-300"
-                          />
-                          <span>{pTask.name}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Add Custom Task field */}
-              <div className="flex items-center space-x-2 mb-4">
-                <input
-                  type="text"
-                  placeholder="Add custom task (e.g. Pool Towel patrol)..."
-                  value={customTaskInputs[dept.name] || ""}
-                  onChange={(e) => setCustomTaskInputs({ ...customTaskInputs, [dept.name]: e.target.value })}
-                  className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none text-black"
-                />
-                <button
-                  onClick={() => handleAddCustomTask(dept.name)}
-                  className="px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-indigo-700 shadow-sm"
-                >
-                  + Custom
-                </button>
-              </div>
-
-              {/* Configured Tasks List with Details, Rules & SOPs */}
-              <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
-                <span className="block text-[9px] uppercase font-bold text-slate-800">Selected Tasks, Timings, & SOPs:</span>
-                {selectedTasks.length === 0 ? (
-                  <p className="text-[10px] text-slate-450 italic py-2">No tasks selected yet. Check tasks above or add a custom one.</p>
-                ) : (
-                  selectedTasks.map((task: any, tIdx: number) => (
-                    <div key={tIdx} className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3 relative group shadow-sm">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveTask(dept.name, task.name);
-                        }}
-                        className="absolute top-4 right-4 text-slate-455 hover:text-rose-500 text-[10px] font-bold"
-                      >
-                        🗑️ Remove
-                      </button>
-                      <div className="w-[85%]">
-                        <p className="text-xs font-bold text-black">{task.name}</p>
-                        <p className="text-[10px] text-slate-500">{task.description}</p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-slate-200">
-                        <div>
-                          <label className="block text-[9px] uppercase font-bold text-slate-700 mb-0.5">Manpower Needed</label>
-                          <input
-                            type="number"
-                            min={1}
-                            value={task.workersNeeded === 0 || task.workersNeeded === undefined ? "" : task.workersNeeded}
-                            onChange={(e) => handleUpdateTaskDetailField(dept.name, task.name, "workersNeeded", e.target.value === "" ? "" : parseInt(e.target.value) || 0)}
-                            placeholder="People"
-                            className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs text-black focus:outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] uppercase font-bold text-slate-700 mb-0.5">Est. Duration (Mins)</label>
-                          <input
-                            type="number"
-                            min={1}
-                            value={task.duration === 0 || task.duration === undefined ? "" : task.duration}
-                            onChange={(e) => handleUpdateTaskDetailField(dept.name, task.name, "duration", e.target.value === "" ? "" : parseInt(e.target.value) || 0)}
-                            placeholder="Mins"
-                            className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs text-black focus:outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-[9px] uppercase font-bold text-slate-700">Task Variations (Select options or type custom)</label>
-                        <div className="flex flex-wrap gap-1.5 mb-1 bg-slate-50 p-2 border border-slate-200 rounded-lg">
-                          {getVariationPresets(task.name).map((vOpt) => {
-                            const selectedList = (task.variations || "").split(",").map((s: string) => s.trim()).filter(Boolean);
-                            const isSelected = selectedList.includes(vOpt);
-                            return (
-                              <button
-                                key={vOpt}
-                                type="button"
-                                onClick={() => {
-                                  let newList;
-                                  if (isSelected) {
-                                    newList = selectedList.filter((x: string) => x !== vOpt);
-                                  } else {
-                                    newList = [...selectedList, vOpt];
-                                  }
-                                  handleUpdateTaskDetailField(dept.name, task.name, "variations", newList.join(", "));
-                                }}
-                                className={`px-2 py-0.5 rounded text-[10px] border font-semibold transition ${
-                                  isSelected
-                                    ? "bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm"
-                                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                                }`}
-                              >
-                                {isSelected ? "✓ " : ""}{vOpt}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <input
-                          type="text"
-                          value={task.variations || ""}
-                          onChange={(e) => handleUpdateTaskDetailField(dept.name, task.name, "variations", e.target.value)}
-                          placeholder="Or type custom variations (comma separated)..."
-                          className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs text-black focus:outline-none"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="block text-[9px] uppercase font-bold text-indigo-700 font-semibold">Standards & SOP Guidelines</label>
-                        <textarea
-                          rows={2}
-                          value={task.rules || ""}
-                          onChange={(e) => handleUpdateTaskDetailField(dept.name, task.name, "rules", e.target.value)}
-                          placeholder="e.g. Wear gloves, use eco-friendly cleaners, complete in 30 mins..."
-                          className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs text-black focus:outline-none resize-none"
-                        />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Food & Beverage specific Restaurant Menu Config */}
-        {deptKey === "food & beverage" && (
-          <div className="space-y-4 pt-5 border-t border-slate-200">
-            <div className="flex justify-between items-center">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">F&B Restaurant / Room Service Menu</label>
+        <div className="space-y-3 bg-slate-50 p-5 border border-slate-200 rounded-xl">
+          {((dept.positions && dept.positions.length > 0) ? dept.positions : [{ name: "Staff", count: dept.workerCount || 5 }]).map((pos: any, pIdx: number) => (
+            <div key={pIdx} className="flex items-center space-x-3">
+              <input
+                type="text"
+                value={pos.name}
+                onChange={(e) => {
+                  const currentPositions = dept.positions || [{ name: "Staff", count: dept.workerCount || 5 }];
+                  const updated = [...currentPositions];
+                  updated[pIdx] = { ...updated[pIdx], name: e.target.value };
+                  handleUpdateDeptField(dept.name, "positions", updated);
+                }}
+                placeholder="Position Name (e.g. Room Attendant)"
+                className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-black focus:outline-none"
+              />
+              <input
+                type="number"
+                min={0}
+                value={pos.count === 0 && pos.count !== "" ? "" : pos.count}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const countVal = val === "" ? "" : parseInt(val) || 0;
+                  const currentPositions = dept.positions || [{ name: "Staff", count: dept.workerCount || 5 }];
+                  const updated = [...currentPositions];
+                  updated[pIdx] = { ...updated[pIdx], count: countVal };
+                  const newTotal = updated.reduce((acc: number, p: any) => acc + (parseInt(p.count) || 0), 0);
+                  handleUpdateDeptFields(dept.name, {
+                    positions: updated,
+                    workerCount: newTotal
+                  });
+                }}
+                placeholder="Qty"
+                className="w-24 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-black text-center focus:outline-none"
+              />
               <button
                 type="button"
                 onClick={() => {
-                  const currentMenu = dept.menu || [];
-                  const updated = [...currentMenu, { name: "New Menu Item", prepTime: 15, price: "300.00", imageType: "Sandwich", image: foodImagePresets["Sandwich"], allergens: "" }];
-                  handleUpdateDeptField(dept.name, "menu", updated);
+                  const currentPositions = dept.positions || [{ name: "Staff", count: dept.workerCount || 5 }];
+                  const updated = [...currentPositions];
+                  updated.splice(pIdx, 1);
+                  const newTotal = updated.reduce((acc: number, p: any) => acc + (parseInt(p.count) || 0), 0);
+                  handleUpdateDeptFields(dept.name, {
+                    positions: updated,
+                    workerCount: newTotal
+                  });
                 }}
-                className="text-xs text-indigo-650 hover:text-indigo-500 font-bold"
+                className="text-slate-400 hover:text-rose-500 text-sm p-1 ml-1"
               >
-                + Add Menu Item
+                🗑️
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(dept.menu || []).map((item: any, mIdx: number) => (
-                <div key={mIdx} className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3 relative shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const updated = [...(dept.menu || [])];
-                      updated.splice(mIdx, 1);
-                      handleUpdateDeptField(dept.name, "menu", updated);
-                    }}
-                    className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 text-xs font-bold"
-                  >
-                    🗑️
-                  </button>
-                  
-                  <div className="flex items-start space-x-3.5">
-                    {/* Food Thumbnail Image */}
-                    <div className="w-16 h-16 rounded-lg overflow-hidden border border-slate-200 flex-shrink-0 bg-slate-100 flex items-center justify-center">
-                      {item.image ? (
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-xl">🍔</span>
-                      )}
-                    </div>
-                    
-                    <div className="flex-1 space-y-1.5">
-                      <input
-                        type="text"
-                        value={item.name}
-                        onChange={(e) => {
-                          const updated = [...(dept.menu || [])];
-                          updated[mIdx] = { ...updated[mIdx], name: e.target.value };
-                          handleUpdateDeptField(dept.name, "menu", updated);
-                        }}
-                        placeholder="Menu Item Name"
-                        className="w-[85%] bg-transparent border-b border-slate-250 focus:border-indigo-500 text-xs font-bold text-black focus:outline-none pb-0.5"
-                      />
+          ))}
+          <div className="pt-4 border-t border-slate-200 flex justify-between items-center text-xs font-bold text-slate-800">
+            <span>Total Calculated Headcount:</span>
+            <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full">{dept.workerCount || 0} active workers</span>
+          </div>
+        </div>
+      </div>
 
-                      {/* Food Image File Uploader */}
-                      <div className="flex items-center space-x-2 text-[10px]">
-                        <label className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-2 py-0.5 rounded cursor-pointer hover:bg-indigo-100 font-semibold transition text-[9px]">
-                          <span>Upload Image</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  const updated = [...(dept.menu || [])];
-                                  updated[mIdx] = { 
-                                    ...updated[mIdx], 
-                                    image: reader.result as string 
-                                  };
-                                  handleUpdateDeptField(dept.name, "menu", updated);
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
-                        </label>
-                        {item.image && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = [...(dept.menu || [])];
-                              updated[mIdx] = { ...updated[mIdx], image: "" };
-                              handleUpdateDeptField(dept.name, "menu", updated);
-                            }}
-                            className="text-rose-500 font-semibold text-[9px]"
-                          >
-                            Clear
-                          </button>
-                        )}
-                      </div>
+      {/* CARD 2: Operating Shifts & Rosters */}
+      <div className="bg-white p-8 rounded-2xl border border-slate-200 space-y-6 shadow-sm">
+        <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+              <span>🕒</span>
+              <span>Operating Shifts & Rosters</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">Set the operating hours and shifts during which staff are active.</p>
+          </div>
+          <button
+            onClick={() => handleAddShift(dept.name)}
+            className="px-4 py-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-600 text-xs font-bold rounded-xl shadow-sm transition"
+          >
+            ➕ Add Shift
+          </button>
+        </div>
+
+        <div className="space-y-3 bg-slate-50 p-5 border border-slate-200 rounded-xl">
+          {(dept.shifts || []).length === 0 ? (
+            <p className="text-xs text-slate-450 italic py-2">No shifts configured. Add a shift roster.</p>
+          ) : (
+            (dept.shifts || []).map((shift: any, sIdx: number) => (
+              <div key={sIdx} className="flex items-center space-x-3 bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+                <input
+                  type="text"
+                  value={shift.name}
+                  onChange={(e) => handleUpdateShiftField(dept.name, sIdx, "name", e.target.value)}
+                  placeholder="Shift Name"
+                  className="flex-1 bg-transparent text-xs font-bold text-black focus:outline-none"
+                />
+                <div className="flex items-center space-x-2 text-xs text-slate-700">
+                  <input
+                    type="time"
+                    value={shift.open}
+                    onChange={(e) => handleUpdateShiftField(dept.name, sIdx, "open", e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-black"
+                  />
+                  <span>to</span>
+                  <input
+                    type="time"
+                    value={shift.close}
+                    onChange={(e) => handleUpdateShiftField(dept.name, sIdx, "close", e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-black"
+                  />
+                </div>
+                <button
+                  onClick={() => handleRemoveShift(dept.name, sIdx)}
+                  className="text-slate-400 hover:text-rose-500 text-sm p-1 ml-2"
+                >
+                  🗑️
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* CARD 3: Operational Tasks Checklist & SOPs */}
+      <div className="bg-white p-8 rounded-2xl border border-slate-200 space-y-6 shadow-sm">
+        <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+              <span>📋</span>
+              <span>Operational Tasks & SOPs</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">Select standard operational tasks, define service level agreements (SLAs), and write SOP guidelines.</p>
+          </div>
+          <button
+            onClick={() => handleFetchAIDiscovery(dept.name)}
+            disabled={isLoadingAI[dept.name]}
+            className="px-4 py-2 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl shadow-sm transition flex items-center space-x-1.5 disabled:opacity-50"
+          >
+            <span>🤖</span>
+            <span>{isLoadingAI[dept.name] ? "Tailoring..." : "Tailored AI Discovery"}</span>
+          </button>
+        </div>
+
+        {predefined.length > 0 && (
+          <div className="bg-slate-50 p-5 border border-slate-200 rounded-xl space-y-3">
+            <span className="block text-[10px] uppercase font-bold text-slate-805 tracking-wider">Predefined Tasks Directory</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {predefined.map((pTask) => {
+                const isChecked = selectedTasks.some((t: any) => t.name.toLowerCase() === pTask.name.toLowerCase());
+                return (
+                  <div 
+                    key={pTask.name}
+                    onClick={() => handleTogglePredefinedTask(dept.name, pTask, !isChecked)}
+                    className={`flex items-start space-x-2.5 text-xs text-slate-850 cursor-pointer p-2.5 rounded-xl border transition ${
+                      isChecked 
+                        ? "bg-indigo-50/70 border-indigo-200 font-semibold text-indigo-900" 
+                        : "bg-white border-slate-200 hover:bg-slate-55 hover:border-slate-350"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {}}
+                      className="accent-indigo-600 rounded border-slate-305 mt-0.5"
+                    />
+                    <span>{pTask.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Add Custom Task field */}
+        <div className="space-y-2">
+          <label className="block text-[10px] uppercase font-bold text-slate-850 tracking-wider">Add Custom Operational Task</label>
+          <div className="flex items-center space-x-3">
+            <input
+              type="text"
+              placeholder="e.g. Pool Towel patrol, VIP Welcome greeting..."
+              value={customTaskInputs[dept.name] || ""}
+              onChange={(e) => setCustomTaskInputs({ ...customTaskInputs, [dept.name]: e.target.value })}
+              className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:outline-none text-black"
+            />
+            <button
+              onClick={() => handleAddCustomTask(dept.name)}
+              className="px-5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-indigo-750 shadow-sm transition"
+            >
+              ➕ Add Task
+            </button>
+          </div>
+        </div>
+
+        {/* Configured Tasks List with Details, Rules & SOPs */}
+        <div className="space-y-4 pt-4 border-t border-slate-105">
+          <span className="block text-[10px] uppercase font-bold text-slate-850 tracking-wider">Active Tasks Specifications ({selectedTasks.length})</span>
+          {selectedTasks.length === 0 ? (
+            <p className="text-xs text-slate-450 italic py-4 bg-slate-55 rounded-xl text-center border border-dashed border-slate-200">No tasks selected yet. Choose from the directory or create a custom task.</p>
+          ) : (
+            <div className="space-y-4">
+              {selectedTasks.map((task: any, tIdx: number) => (
+                <div key={tIdx} className="bg-white border border-slate-200 p-6 rounded-2xl space-y-4 relative group shadow-sm">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveTask(dept.name, task.name);
+                    }}
+                    className="absolute top-6 right-6 text-slate-400 hover:text-rose-500 text-xs font-bold transition"
+                  >
+                    🗑️ Remove
+                  </button>
+                  <div className="w-[85%]">
+                    <p className="text-xs font-bold text-black">{task.name}</p>
+                    <p className="text-[10px] text-slate-500 mt-1">{task.description}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+                    <div>
+                      <label className="block text-[9px] uppercase font-bold text-slate-700 mb-1">Workers Required</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={task.workersNeeded === 0 || task.workersNeeded === undefined ? "" : task.workersNeeded}
+                        onChange={(e) => handleUpdateTaskDetailField(dept.name, task.name, "workersNeeded", e.target.value === "" ? "" : parseInt(e.target.value) || 0)}
+                        placeholder="Staff count"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs text-black focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] uppercase font-bold text-slate-700 mb-1">Standard Duration (Minutes)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={task.duration === 0 || task.duration === undefined ? "" : task.duration}
+                        onChange={(e) => handleUpdateTaskDetailField(dept.name, task.name, "duration", e.target.value === "" ? "" : parseInt(e.target.value) || 0)}
+                        placeholder="Target minutes"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs text-black focus:outline-none"
+                      />
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-6 text-xs text-slate-700 pt-1.5 border-t border-slate-200/40">
-                    <div className="flex items-center space-x-1.5">
-                      <span>Prep Time:</span>
-                      <input
-                        type="number"
-                        value={item.prepTime === 0 && item.prepTime !== "" ? "" : item.prepTime}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const updated = [...(dept.menu || [])];
-                          updated[mIdx] = { ...updated[mIdx], prepTime: val === "" ? "" : parseInt(val) || 0 };
-                          handleUpdateDeptField(dept.name, "menu", updated);
-                        }}
-                        placeholder="Mins"
-                        className="w-12 bg-white border border-slate-200 rounded text-center px-1.5 py-0.5 text-xs text-black focus:outline-none"
-                      />
-                      <span>mins</span>
+                  <div className="space-y-2">
+                    <label className="block text-[9px] uppercase font-bold text-slate-705">Task Variations (Select options or type custom)</label>
+                    <div className="flex flex-wrap gap-1.5 bg-slate-50 p-3 border border-slate-200 rounded-xl">
+                      {getVariationPresets(task.name).map((vOpt) => {
+                        const selectedList = (task.variations || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+                        const isSelected = selectedList.includes(vOpt);
+                        return (
+                          <button
+                            key={vOpt}
+                            type="button"
+                            onClick={() => {
+                              let newList;
+                              if (isSelected) {
+                                newList = selectedList.filter((x: string) => x !== vOpt);
+                              } else {
+                                newList = [...selectedList, vOpt];
+                              }
+                              handleUpdateTaskDetailField(dept.name, task.name, "variations", newList.join(", "));
+                            }}
+                            className={`px-3 py-1 rounded-lg text-[10px] border font-bold transition ${
+                              isSelected
+                                ? "bg-indigo-55 border-indigo-200 text-indigo-700 shadow-sm"
+                                : "bg-white border-slate-200 text-slate-650 hover:bg-slate-100"
+                            }`}
+                          >
+                            {isSelected ? "✓ " : ""}{vOpt}
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div className="flex items-center space-x-1.5">
-                      <span>Price (₱):</span>
-                      <input
-                        type="text"
-                        value={item.price}
-                        onChange={(e) => {
-                          const updated = [...(dept.menu || [])];
-                          updated[mIdx] = { ...updated[mIdx], price: e.target.value };
-                          handleUpdateDeptField(dept.name, "menu", updated);
-                        }}
-                        placeholder="PHP"
-                        className="w-20 bg-white border border-slate-200 rounded text-center px-1.5 py-0.5 text-xs text-black focus:outline-none font-bold"
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      value={task.variations || ""}
+                      onChange={(e) => handleUpdateTaskDetailField(dept.name, task.name, "variations", e.target.value)}
+                      placeholder="Or type custom variations (comma separated)..."
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs text-black focus:outline-none"
+                    />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[9px] uppercase font-bold text-amber-800">Food Allergens Warning</label>
+                    <label className="block text-[9px] uppercase font-bold text-indigo-700 font-bold">Standard Operating Procedures (SOPs)</label>
+                    <textarea
+                      rows={2.5}
+                      value={task.rules || ""}
+                      onChange={(e) => handleUpdateTaskDetailField(dept.name, task.name, "rules", e.target.value)}
+                      placeholder="Specify safety gear, step-by-step checklists, or validation criteria..."
+                      className="w-full bg-white border border-slate-200 rounded-xl p-3.5 text-xs text-black focus:outline-none resize-none"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* CARD 4: Food & Beverage specific Restaurant Menu Config */}
+      {deptKey === "food & beverage" && (
+        <div className="bg-white p-8 rounded-2xl border border-slate-200 space-y-6 shadow-sm">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+                <span>🍽️</span>
+                <span>Food & Beverage Menu Directory</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">Configure restaurant and room service items, pricing, prep times, and allergy warnings.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const currentMenu = dept.menu || [];
+                const updated = [...currentMenu, { name: "New Menu Item", prepTime: 15, price: "300.00", imageType: "Sandwich", image: foodImagePresets["Sandwich"], allergens: "" }];
+                handleUpdateDeptField(dept.name, "menu", updated);
+              }}
+              className="px-4 py-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-600 text-xs font-bold rounded-xl shadow-sm transition"
+            >
+              ➕ Add Menu Item
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {(dept.menu || []).map((item: any, mIdx: number) => (
+              <div key={mIdx} className="bg-slate-50 border border-slate-200 p-6 rounded-2xl space-y-4 relative shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = [...(dept.menu || [])];
+                    updated.splice(mIdx, 1);
+                    handleUpdateDeptField(dept.name, "menu", updated);
+                  }}
+                  className="absolute top-6 right-6 text-slate-400 hover:text-rose-500 text-xs font-bold"
+                >
+                  🗑️ Delete Item
+                </button>
+                
+                <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                  {/* Food Thumbnail Image */}
+                  <div className="w-20 h-20 rounded-xl overflow-hidden border border-slate-250 bg-slate-100 flex items-center justify-center flex-shrink-0 shadow-inner">
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-2xl">🍔</span>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 space-y-2 w-full">
                     <input
                       type="text"
-                      value={item.allergens || ""}
+                      value={item.name}
                       onChange={(e) => {
                         const updated = [...(dept.menu || [])];
-                        updated[mIdx] = { ...updated[mIdx], allergens: e.target.value };
+                        updated[mIdx] = { ...updated[mIdx], name: e.target.value };
                         handleUpdateDeptField(dept.name, "menu", updated);
                       }}
-                      placeholder="e.g. Nuts, Dairy, Gluten (Leave empty if none)"
-                      className="w-full bg-white border border-slate-200 rounded p-1.5 text-[10px] text-black focus:outline-none"
+                      placeholder="Menu Item Name"
+                      className="w-full bg-transparent border-b border-slate-200 focus:border-indigo-500 text-sm font-bold text-black focus:outline-none pb-1"
                     />
-                  </div>
 
-                  {item.allergens && (
-                    <div className="bg-amber-50 border border-amber-200 p-2 rounded-lg text-amber-900 text-[10px] font-bold flex items-center space-x-1">
-                      <span>⚠️ Allergy Alert:</span>
-                      <span className="font-semibold">{item.allergens}</span>
+                    {/* Food Image File Uploader */}
+                    <div className="flex items-center space-x-2 text-[10px]">
+                      <label className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1 rounded-lg cursor-pointer hover:bg-indigo-100 font-bold transition">
+                        <span>Upload Image File</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                const updated = [...(dept.menu || [])];
+                                updated[mIdx] = { 
+                                  ...updated[mIdx], 
+                                  image: reader.result as string 
+                                };
+                                handleUpdateDeptField(dept.name, "menu", updated);
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                      {item.image && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = [...(dept.menu || [])];
+                            updated[mIdx] = { ...updated[mIdx], image: "" };
+                            handleUpdateDeptField(dept.name, "menu", updated);
+                          }}
+                          className="text-rose-500 font-bold px-2 py-1"
+                        >
+                          Clear Image
+                        </button>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* Laundry specific Fabric Processing Config */}
-        {deptKey === "laundry" && (
-          <div className="space-y-4 pt-5 border-t border-slate-200">
-            <div className="flex justify-between items-center">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">Laundry Processing Cloth Types</label>
-              <button
-                type="button"
-                onClick={() => {
-                  const currentVars = dept.laundryVariations || [];
-                  const updated = [...currentVars, { clothType: "New Cloth Type", prepTime: 60 }];
-                  handleUpdateDeptField(dept.name, "laundryVariations", updated);
-                }}
-                className="text-xs text-indigo-650 hover:text-indigo-500 font-bold"
-              >
-                + Add Cloth Type
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(dept.laundryVariations || []).map((v: any, vIdx: number) => (
-                <div key={vIdx} className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3 relative shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const updated = [...(dept.laundryVariations || [])];
-                      updated.splice(vIdx, 1);
-                      handleUpdateDeptField(dept.name, "laundryVariations", updated);
-                    }}
-                    className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 text-xs font-bold"
-                  >
-                    🗑️
-                  </button>
-                  <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-200/50">
+                  <div className="flex items-center space-x-2 text-xs text-slate-800">
+                    <span className="w-24">Prep Time:</span>
+                    <input
+                      type="number"
+                      value={item.prepTime === 0 && item.prepTime !== "" ? "" : item.prepTime}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const updated = [...(dept.menu || [])];
+                        updated[mIdx] = { ...updated[mIdx], prepTime: val === "" ? "" : parseInt(val) || 0 };
+                        handleUpdateDeptField(dept.name, "menu", updated);
+                      }}
+                      placeholder="Mins"
+                      className="w-20 bg-white border border-slate-200 rounded-lg text-center px-3 py-1.5 text-xs text-black focus:outline-none"
+                    />
+                    <span>minutes</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs text-slate-800">
+                    <span className="w-24">Price (₱):</span>
                     <input
                       type="text"
-                      value={v.clothType}
+                      value={item.price}
                       onChange={(e) => {
-                        const updated = [...(dept.laundryVariations || [])];
-                        updated[vIdx] = { ...updated[vIdx], clothType: e.target.value };
-                        handleUpdateDeptField(dept.name, "laundryVariations", updated);
+                        const updated = [...(dept.menu || [])];
+                        updated[mIdx] = { ...updated[mIdx], price: e.target.value };
+                        handleUpdateDeptField(dept.name, "menu", updated);
                       }}
-                      placeholder="Cloth/Fabric Type (e.g. Guest Linens)"
-                      className="w-[85%] bg-transparent border-b border-slate-250 focus:border-indigo-500 text-xs font-bold text-black focus:outline-none pb-0.5"
+                      placeholder="PHP"
+                      className="w-28 bg-white border border-slate-200 rounded-lg text-center px-3 py-1.5 text-xs text-black focus:outline-none font-bold"
                     />
-                    <div className="flex items-center space-x-1.5 text-xs text-slate-700">
-                      <span>Est. Processing Duration:</span>
-                      <input
-                        type="number"
-                        value={v.prepTime === 0 && v.prepTime !== "" ? "" : v.prepTime}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const updated = [...(dept.laundryVariations || [])];
-                          updated[vIdx] = { ...updated[vIdx], prepTime: val === "" ? "" : parseInt(val) || 0 };
-                          handleUpdateDeptField(dept.name, "laundryVariations", updated);
-                        }}
-                        placeholder="Mins"
-                        className="w-12 bg-white border border-slate-200 rounded text-center px-1.5 py-0.5 text-xs text-black focus:outline-none"
-                      />
-                      <span>mins</span>
-                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[9px] uppercase font-bold text-amber-800">Food Allergens Warning</label>
+                  <input
+                    type="text"
+                    value={item.allergens || ""}
+                    onChange={(e) => {
+                      const updated = [...(dept.menu || [])];
+                      updated[mIdx] = { ...updated[mIdx], allergens: e.target.value };
+                      handleUpdateDeptField(dept.name, "menu", updated);
+                    }}
+                    placeholder="e.g. Peanuts, Milk, Egg, Soy, Gluten (Leave empty if none)"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-black focus:outline-none"
+                  />
+                </div>
+
+                {item.allergens && (
+                  <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-amber-900 text-xs font-bold flex items-center space-x-1.5 shadow-sm">
+                    <span>⚠️ Allergy Alert:</span>
+                    <span className="font-semibold">{item.allergens}</span>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* CARD 5: Laundry specific Fabric Processing Config */}
+      {deptKey === "laundry" && (
+        <div className="bg-white p-8 rounded-2xl border border-slate-200 space-y-6 shadow-sm">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+                <span>🧺</span>
+                <span>Linens & Fabric Processing Times</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">Define processing timelines for various hotel textiles and guest laundry service orders.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const currentVars = dept.laundryVariations || [];
+                const updated = [...currentVars, { clothType: "New Cloth Type", prepTime: 60 }];
+                handleUpdateDeptField(dept.name, "laundryVariations", updated);
+              }}
+              className="px-4 py-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-600 text-xs font-bold rounded-xl shadow-sm transition"
+            >
+              ➕ Add Cloth Type
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {(dept.laundryVariations || []).map((v: any, vIdx: number) => (
+              <div key={vIdx} className="bg-slate-50 border border-slate-200 p-6 rounded-2xl space-y-3 relative shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = [...(dept.laundryVariations || [])];
+                    updated.splice(vIdx, 1);
+                    handleUpdateDeptField(dept.name, "laundryVariations", updated);
+                  }}
+                  className="absolute top-6 right-6 text-slate-400 hover:text-rose-500 text-xs font-bold"
+                >
+                  🗑/ Delete
+                </button>
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={v.clothType}
+                    onChange={(e) => {
+                      const updated = [...(dept.laundryVariations || [])];
+                      updated[vIdx] = { ...updated[vIdx], clothType: e.target.value };
+                      handleUpdateDeptField(dept.name, "laundryVariations", updated);
+                    }}
+                    placeholder="Cloth/Fabric Type (e.g. Guest Linens)"
+                    className="w-full bg-transparent border-b border-slate-200 focus:border-indigo-500 text-xs font-bold text-black focus:outline-none pb-1"
+                  />
+                  <div className="flex items-center space-x-2 text-xs text-slate-705 pt-1">
+                    <span>Est. Processing Duration:</span>
+                    <input
+                      type="number"
+                      value={v.prepTime === 0 && v.prepTime !== "" ? "" : v.prepTime}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const updated = [...(dept.laundryVariations || [])];
+                        updated[vIdx] = { ...updated[vIdx], prepTime: val === "" ? "" : parseInt(val) || 0 };
+                        handleUpdateDeptField(dept.name, "laundryVariations", updated);
+                      }}
+                      placeholder="Mins"
+                      className="w-16 bg-white border border-slate-200 rounded-lg text-center px-3 py-1.5 text-xs text-black focus:outline-none"
+                    />
+                    <span>minutes</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* AI Readiness Checkpoint Panel */}
       <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm">
@@ -1087,12 +1119,12 @@ export default function Step3Rooms({ data, onChange, onCheckpointUpdate, mode = 
             <button
               onClick={runPhaseAudit}
               disabled={isAuditing}
-              className="px-3 py-1 bg-white border border-slate-250 border-slate-200 text-indigo-700 hover:text-indigo-505 text-[10px] font-bold rounded-lg transition"
+              className="px-3 py-1 bg-white border border-slate-200 text-indigo-700 hover:text-indigo-500 text-[10px] font-bold rounded-lg transition"
             >
               {isAuditing ? "Re-verifying..." : "🔄 Verify Checkpoint"}
             </button>
             <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-              auditComplete ? "bg-emerald-100 text-emerald-700 border border-emerald-250" : "bg-amber-100 text-amber-705 border border-amber-200"
+              auditComplete ? "bg-emerald-100 text-emerald-700 border border-emerald-250" : "bg-amber-100 text-amber-700 border border-amber-200"
             }`}>
               {auditComplete ? "PASSED" : "PENDING GAPS"}
             </span>
@@ -1119,7 +1151,6 @@ export default function Step3Rooms({ data, onChange, onCheckpointUpdate, mode = 
           </div>
         )}
       </div>
-
     </div>
   );
 }

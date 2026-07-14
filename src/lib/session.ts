@@ -78,24 +78,24 @@ export async function getOrCreateDevSession(): Promise<SessionPayload> {
   if (!hotel) {
     hotel = await prisma.hotel.create({
       data: {
-        name: 'Nexus Grand Resort',
-        domain: 'nexus',
+        name: 'Clark Marriott Hotel',
+        domain: 'clarkmarriott',
         timezone: 'Asia/Manila',
         brandColor: '#4F46E5',
-        totalRooms: 120,
+        totalRooms: 260,
         onboardingCompleted: false,
       },
     });
   }
 
   let user = await prisma.user.findUnique({
-    where: { email: 'admin@nexus.com' },
+    where: { email: 'admin@clarkmarriott.com' },
   });
   if (!user) {
     user = await prisma.user.create({
       data: {
-        name: 'Nexus Admin',
-        email: 'admin@nexus.com',
+        name: 'Marriott Admin',
+        email: 'admin@clarkmarriott.com',
         role: 'admin',
         password: 'password', 
         hotelId: hotel.id,
