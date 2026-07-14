@@ -1,0 +1,268 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Hotel {
+  id                  Int                  @id @default(autoincrement())
+  name                String
+  domain              String?              @unique
+  timezone            String               @default("UTC")
+  brandColor          String               @default("#4F46E5")
+  totalRooms          Int?
+  settings            Json?
+  onboardingCompleted Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  users               User[]
+  departments         Department[]
+  knowledgeBases      HotelKnowledgeBase[]
+  documents           HotelDocument[]
+  onboardingSessions  OnboardingSession[]
+  roomTypes           RoomType[]
+  amenities           Amenity[]
+  facilities          Facility[]
+  policies            Policy[]
+  faqs                FAQ[]
+  emergencyProcedures EmergencyProcedure[]
+  routingRules        RoutingRule[]
+  priorityRules       PriorityRule[]
+  escalationRules     EscalationRule[]
+  tasks               Task[]
+  handovers           HandoverLog[]
+  pttClips            PttClip[]
+  nfcTags             NfcTag[]
+}
+
+model User {
+  id                 Int          @id @default(autoincrement())
+  name               String
+  email              String       @unique
+  password           String
+  role               String       @default("worker")
+  hotelId            Int?
+  hotel              Hotel?       @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  departmentId       Int?
+  department         Department?  @relation("DepartmentStaff", fields: [departmentId], references: [id], onDelete: SetNull)
+  managedDepartments Department[] @relation("DepartmentManager")
+  schedule           Json?
+  isOnShift          Boolean      @default(false)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+}
+
+model Department {
+  id             Int           @id @default(autoincrement())
+  hotelId        Int
+  hotel          Hotel         @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  managerId      Int?
+  manager        User?         @relation("DepartmentManager", fields: [managerId], references: [id], onDelete: SetNull)
+  isActive       Boolean       @default(true)
+  operatingHours Json?
+  staff          User[]        @relation("DepartmentStaff")
+  services       Service[]
+  routingRules   RoutingRule[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Service {
+  id           Int        @id @default(autoincrement())
+  departmentId Int
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model HotelDocument {
+  id            Int      @id @default(autoincrement())
+  hotelId       Int
+  hotel         Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  name          String
+  filePath      String
+  mimeType      String
+  status        String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  extractedText String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model OnboardingSession {
+  id        Int      @id @default(autoincrement())
+  hotelId   Int      @unique
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  step      Int      @default(1)
+  data      Json // Stores active draft data for the wizard steps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RoomType {
+  id        Int       @id @default(autoincrement())
+  hotelId   Int
+  hotel     Hotel     @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  name      String
+  capacity  Int
+  bedTypes  String
+  amenities Amenity[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Amenity {
+  id          Int        @id @default(autoincrement())
+  hotelId     Int
+  hotel       Hotel      @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  roomTypes   RoomType[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Facility {
+  id             Int      @id @default(autoincrement())
+  hotelId        Int
+  hotel          Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  operatingHours Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Policy {
+  id        Int      @id @default(autoincrement())
+  hotelId   Int
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  topic     String
+  rule      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FAQ {
+  id        Int      @id @default(autoincrement())
+  hotelId   Int
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  question  String
+  answer    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EmergencyProcedure {
+  id          Int      @id @default(autoincrement())
+  hotelId     Int
+  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  title       String
+  steps       Json
+  contactInfo String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model RoutingRule {
+  id           Int        @id @default(autoincrement())
+  hotelId      Int
+  hotel        Hotel      @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  trigger      String // service name or keyword
+  departmentId Int
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model PriorityRule {
+  id        Int      @id @default(autoincrement())
+  hotelId   Int
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  trigger   String // service name or keyword
+  priority  String // LOW, MEDIUM, HIGH, CRITICAL
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EscalationRule {
+  id          Int      @id @default(autoincrement())
+  hotelId     Int
+  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  trigger     String // service name or keyword
+  slaMinutes  Int
+  escalateTo  String // Supervisor, Manager, GM
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model HotelKnowledgeBase {
+  id            Int      @id @default(autoincrement())
+  hotelId       Int
+  hotel         Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  departments   Json?
+  services      Json?
+  roomTypes     Json?
+  amenities     Json?
+  policies      Json?
+  faqs          Json?
+  emergencyInfo Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Task {
+  id           String   @id
+  name         String
+  dept         String
+  room         String
+  difficulty   Int
+  priority     String
+  slaMinutes   Int
+  status       String   // backlog, in_progress, completed
+  createdAt    String
+  completedAt  String?
+  workerId     Int?
+  isOverloaded Boolean  @default(false)
+  photoUrl     String?  // base64 completion proof photo
+  hotelId      Int
+  hotel        Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+}
+
+model HandoverLog {
+  id        Int      @id @default(autoincrement())
+  author    String
+  text      String
+  time      String
+  hotelId   Int
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+}
+
+model PttClip {
+  id        Int      @id @default(autoincrement())
+  sender    String
+  duration  String
+  text      String
+  timestamp String
+  hotelId   Int
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+}
+
+model NfcTag {
+  id          String   @id @default(uuid())
+  hotelId     Int
+  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  roomNumber  String
+  location    String
+  displayName String
+  services    Json
+  menuItems   Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
